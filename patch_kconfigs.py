@@ -1010,6 +1010,83 @@ if os.path.exists(ak_path):
         f.write(akc)
     print("Fixed unused variable ret2 in ak4376.c")
 
+# 43. Fix tfa98xx_v6.c speakerImpedance and np
+tfa_path = "techpack/audio/asoc/codecs/tfa98xx-v6/tfa98xx_v6.c"
+if os.path.exists(tfa_path):
+    with open(tfa_path, "r", encoding="utf-8", errors="ignore") as f:
+        tfac = f.read()
+    tfac = tfac.replace(
+        "#ifdef OPLUS_ARCH_EXTENDS\n\tint calibrate_done = 0;\n\tint speakerImpedance = 0;\n\t#endif /* OPLUS_ARCH_EXTENDS */",
+        "\tint calibrate_done = 0;\n\tint speakerImpedance = 0;"
+    )
+    tfac = tfac.replace(
+        "struct device_node *np = i2c->dev.of_node;",
+        "struct device_node *np = i2c->dev.of_node;\n\t(void)np;"
+    )
+    with open(tfa_path, "w", encoding="utf-8") as f:
+        f.write(tfac)
+    print("Fixed speakerImpedance and np in tfa98xx_v6.c")
+
+# 44. Fix cam_cpas_hw.c num_camnoc_axi_ports
+cpas_path = "techpack/camera/drivers/cam_cpas/cam_cpas_hw.c"
+if os.path.exists(cpas_path):
+    with open(cpas_path, "r", encoding="utf-8", errors="ignore") as f:
+        cpasc = f.read()
+    target_block = """\tif (soc_private->control_camnoc_axi_clk) {
+\t\tCAM_INFO(CAM_CPAS, "applied camnoc axi clk[%lld]",
+\t\t\tcpas_core->applied_camnoc_axi_rate);
+\t} else {
+\t\tfor (i = 0; i < cpas_core->num_camnoc_axi_ports; i++) {
+\t\t\tCAM_INFO(CAM_CPAS,
+\t\t\t\t"[%s] ab_bw[%lld] ib_bw[%lld] additional_bw[%lld] applied_ab[%lld] applied_ib[%lld]",
+\t\t\t\tcpas_core->camnoc_axi_port[i].axi_port_name,
+\t\t\t\tcpas_core->camnoc_axi_port[i].ab_bw,
+\t\t\t\tcpas_core->camnoc_axi_port[i].ib_bw,
+\t\t\t\tcpas_core->camnoc_axi_port[i].additional_bw,
+\t\t\t\tcpas_core->camnoc_axi_port[i].applied_ab_bw,
+\t\t\t\tcpas_core->camnoc_axi_port[i].applied_ib_bw);
+\t\t}
+\t}"""
+    replacement_block = """#ifdef OPLUS_FEATURE_CAMERA_COMMON
+\tif (soc_private->control_camnoc_axi_clk) {
+\t\tCAM_INFO(CAM_CPAS, "applied camnoc axi clk[%lld]",
+\t\t\tcpas_core->applied_camnoc_axi_rate);
+\t} else {
+\t\tfor (i = 0; i < cpas_core->num_camnoc_axi_ports; i++) {
+\t\t\tCAM_INFO(CAM_CPAS,
+\t\t\t\t"[%s] ab_bw[%lld] ib_bw[%lld] additional_bw[%lld] applied_ab[%lld] applied_ib[%lld]",
+\t\t\t\tcpas_core->camnoc_axi_port[i].axi_port_name,
+\t\t\t\tcpas_core->camnoc_axi_port[i].ab_bw,
+\t\t\t\tcpas_core->camnoc_axi_port[i].ib_bw,
+\t\t\t\tcpas_core->camnoc_axi_port[i].additional_bw,
+\t\t\t\tcpas_core->camnoc_axi_port[i].applied_ab_bw,
+\t\t\t\tcpas_core->camnoc_axi_port[i].applied_ib_bw);
+\t\t}
+\t}
+#endif"""
+    cpasc = cpasc.replace(target_block, replacement_block)
+    with open(cpas_path, "w", encoding="utf-8") as f:
+        f.write(cpasc)
+    print("Fixed num_camnoc_axi_ports in cam_cpas_hw.c")
+
+# 45. Fix KernelSU sucompat.c linux/pgtable.h on 4.19
+for sucompat in [
+    "drivers/kernelsu/feature/sucompat.c",
+    "KernelSU-Next/kernel/feature/sucompat.c",
+    "KernelSU/kernel/feature/sucompat.c"
+]:
+    if os.path.exists(sucompat):
+        with open(sucompat, "r", encoding="utf-8", errors="ignore") as f:
+            suc = f.read()
+        if "#include <linux/pgtable.h>" in suc:
+            suc = suc.replace(
+                "#include <linux/pgtable.h>",
+                "#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)\n#include <linux/pgtable.h>\n#else\n#include <asm/pgtable.h>\n#endif"
+            )
+            with open(sucompat, "w", encoding="utf-8") as f:
+                f.write(suc)
+            print(f"Patched linux/pgtable.h in {sucompat}")
+
 
 
 

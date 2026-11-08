@@ -44,6 +44,7 @@ jobs:
         # 2. Integrate KernelSU-Next (native SuSFS support)
         echo "Integrating KernelSU-Next..."
         curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
+        find drivers/kernelsu -name "sucompat.c" -exec sed -i 's|#include <linux/pgtable.h>|#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)\n#include <linux/pgtable.h>\n#else\n#include <asm/pgtable.h>\n#endif|' {} + || true
         
         # 3. Apply NoMount built-in driver
         echo "Applying NoMount integration..."
