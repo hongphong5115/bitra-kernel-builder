@@ -152,8 +152,9 @@ for root, dirs, files in os.walk("."):
                                 c_src = os.path.join(root, base + ".c")
                                 s_src = os.path.join(root, base + ".S")
                                 s2_src = os.path.join(root, base + ".s")
-                                is_comp = (f"{base}-objs" in whole_file) or (f"{base}-y" in whole_file)
-                                if not os.path.exists(c_src) and not os.path.exists(s_src) and not os.path.exists(s2_src) and not is_comp:
+                                is_comp = (f"{base}-objs" in whole_file) or (f"{base}-y" in whole_file) or (f"{base}-" in whole_file)
+                                is_gen = any(k in base for k in ["devpts", "defkeymap", "consolemap", "logo_", "vdso", "kvm", "capflags", "kexec", "vsyscall"]) or any(k in root.replace('\\', '/') for k in ["drivers/tty/vt", "drivers/video/logo", "fs/devpts", "arch/arm64/kvm", "arch/x86"])
+                                if not os.path.exists(c_src) and not os.path.exists(s_src) and not os.path.exists(s2_src) and not is_comp and not is_gen:
                                     has_missing = True
                                     print(f"Disabled missing OEM source obj: {token} in {mf_path}")
                                     continue
@@ -814,6 +815,98 @@ if os.path.exists("drivers/usb/pd/policy_engine.c"):
     with open("drivers/usb/pd/policy_engine.c", "w", encoding="utf-8") as f:
         f.write(pec)
     print("Fixed drivers/usb/pd/policy_engine.c pd_lobal declaration")
+
+# 30. Fix drivers/usb/pd/policy_engine.c missing oplus_wpc_set_wrx_en_value
+if os.path.exists("drivers/usb/pd/policy_engine.c"):
+    with open("drivers/usb/pd/policy_engine.c", "r", encoding="utf-8", errors="ignore") as f:
+        pec = f.read()
+    if "void oplus_wpc_set_wrx_en_value" not in pec:
+        pec += "\nvoid oplus_wpc_set_wrx_en_value(int val) {}\nEXPORT_SYMBOL(oplus_wpc_set_wrx_en_value);\n"
+        with open("drivers/usb/pd/policy_engine.c", "w", encoding="utf-8") as f:
+            f.write(pec)
+        print("Added oplus_wpc_set_wrx_en_value stub to policy_engine.c")
+
+# 31. Fix kernel/panic_flush.c & msm-poweroff.c is_fulldump_enable
+if os.path.exists("kernel/panic_flush.c"):
+    with open("kernel/panic_flush.c", "r", encoding="utf-8", errors="ignore") as f:
+        pfc = f.read()
+    if "bool is_fulldump_enable" not in pfc:
+        pfc = "bool is_fulldump_enable(void) { return false; }\n" + pfc
+        with open("kernel/panic_flush.c", "w", encoding="utf-8") as f:
+            f.write(pfc)
+        print("Added is_fulldump_enable stub to kernel/panic_flush.c")
+
+if os.path.exists("drivers/power/reset/msm-poweroff.c"):
+    with open("drivers/power/reset/msm-poweroff.c", "r", encoding="utf-8", errors="ignore") as f:
+        mpc = f.read()
+    mpc = re.sub(r"#ifdef\s+OPLUS_BUG_STABILITY\s*\n\s*bool\s+is_fulldump_enable\(void\)", "bool is_fulldump_enable(void)", mpc)
+    with open("drivers/power/reset/msm-poweroff.c", "w", encoding="utf-8") as f:
+        f.write(mpc)
+    print("Made is_fulldump_enable unconditional in msm-poweroff.c")
+
+# 32. Fix drivers/power/supply/qcom/Makefile schgm-flash.o without smb5-lib
+if os.path.exists("drivers/power/supply/qcom/Makefile"):
+    with open("drivers/power/supply/qcom/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        pmk = f.read()
+    pmk = pmk.replace("schgm-flash.o", "")
+    with open("drivers/power/supply/qcom/Makefile", "w", encoding="utf-8") as f:
+        f.write(pmk)
+    print("Removed schgm-flash.o from drivers/power/supply/qcom/Makefile")
+
+# 33. Disable CONFIG_OPLUS_HANS & stub hans_check_frozen_transcation
+for defcfg in ["arch/arm64/configs/vendor/kona-perf_defconfig", "arch/arm64/configs/vendor/kona_defconfig"]:
+    if os.path.exists(defcfg):
+        with open(defcfg, "r", encoding="utf-8", errors="ignore") as f:
+            dc = f.read()
+        dc = re.sub(r"CONFIG_OPLUS_HANS=y", "CONFIG_OPLUS_HANS=n", dc)
+        with open(defcfg, "w", encoding="utf-8") as f:
+            f.write(dc)
+
+if os.path.exists("drivers/staging/android/Makefile"):
+    with open("drivers/staging/android/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        amk = f.read()
+    amk = re.sub(r"(\bobj-\$\(CONFIG_OPLUS_HANS\)\s*\+=)", r"# \1", amk)
+    with open("drivers/staging/android/Makefile", "w", encoding="utf-8") as f:
+        f.write(amk)
+
+if os.path.exists("drivers/staging/android/hans.c"):
+    with open("drivers/staging/android/hans.c", "r", encoding="utf-8", errors="ignore") as f:
+        hc = f.read()
+    if "int hans_check_frozen_transcation" not in hc:
+        hc += "\nint hans_check_frozen_transcation(void *t, void *p) { return 0; }\n"
+        with open("drivers/staging/android/hans.c", "w", encoding="utf-8") as f:
+            f.write(hc)
+
+# 34. Fix include/linux/msm_drm_notify.h msm_drm_register_client
+if os.path.exists("include/linux/msm_drm_notify.h"):
+    with open("include/linux/msm_drm_notify.h", "r", encoding="utf-8", errors="ignore") as f:
+        dhc = f.read()
+    dhc = re.sub(
+        r"#ifdef\s+CONFIG_DRM_MSM[\s\S]*?#endif",
+        "static inline int msm_drm_register_client(struct notifier_block *nb) { return 0; }\nstatic inline int msm_drm_unregister_client(struct notifier_block *nb) { return 0; }",
+        dhc
+    )
+    with open("include/linux/msm_drm_notify.h", "w", encoding="utf-8") as f:
+        f.write(dhc)
+    print("Inlined msm_drm_register_client in include/linux/msm_drm_notify.h")
+
+# 35. Fix mm/vmscan.c kswapd_threads & drivers/soc/qcom/watchdog_v2.c cpu_idle_pc_state
+if os.path.exists("mm/vmscan.c"):
+    with open("mm/vmscan.c", "r", encoding="utf-8", errors="ignore") as f:
+        vmc = f.read()
+    vmc = vmc.replace("//int kswapd_threads = DEF_KSWAPD_THREADS_PER_NODE;", "int kswapd_threads = 1;")
+    with open("mm/vmscan.c", "w", encoding="utf-8") as f:
+        f.write(vmc)
+    print("Fixed mm/vmscan.c kswapd_threads declaration")
+
+if os.path.exists("drivers/soc/qcom/watchdog_v2.c"):
+    with open("drivers/soc/qcom/watchdog_v2.c", "r", encoding="utf-8", errors="ignore") as f:
+        wdc = f.read()
+    wdc = wdc.replace("static int cpu_idle_pc_state[NR_CPUS];", "int cpu_idle_pc_state[NR_CPUS];")
+    with open("drivers/soc/qcom/watchdog_v2.c", "w", encoding="utf-8") as f:
+        f.write(wdc)
+    print("Fixed drivers/soc/qcom/watchdog_v2.c cpu_idle_pc_state declaration")
+
 
 
 
