@@ -132,6 +132,8 @@ jobs:
         echo "CONFIG_VIRTUAL_RESERVE_MEMORY=n" >> arch/arm64/configs/$DEFCONFIG
         sed -i '/CONFIG_PHYSICAL_ANTI_FRAGMENTATION/d' arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_PHYSICAL_ANTI_FRAGMENTATION=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_OPLUS_FEATURE_UXIO_FIRST/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_OPLUS_FEATURE_UXIO_FIRST=n" >> arch/arm64/configs/$DEFCONFIG
 
     - name: Compile Ultimate Kernel
       run: |

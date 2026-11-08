@@ -933,7 +933,7 @@ for dc in [
 ]:
     if os.path.exists(dc):
         with open(dc, "a", encoding="utf-8") as f:
-            f.write("\nCONFIG_OPLUS_HEALTHINFO=n\nCONFIG_OPLUS_JANK_INFO=n\nCONFIG_DUMP_TASKS_MEM=n\nCONFIG_PROCESS_RECLAIM_ENHANCE=n\nCONFIG_VIRTUAL_RESERVE_MEMORY=n\nCONFIG_PHYSICAL_ANTI_FRAGMENTATION=n\n")
+            f.write("\nCONFIG_OPLUS_HEALTHINFO=n\nCONFIG_OPLUS_JANK_INFO=n\nCONFIG_DUMP_TASKS_MEM=n\nCONFIG_PROCESS_RECLAIM_ENHANCE=n\nCONFIG_VIRTUAL_RESERVE_MEMORY=n\nCONFIG_PHYSICAL_ANTI_FRAGMENTATION=n\nCONFIG_OPLUS_FEATURE_UXIO_FIRST=n\n")
 
 # 37. Fix kswapd_unbind_cpu in kernel/sched/core.c and include/linux/swap.h
 if os.path.exists("kernel/sched/core.c"):
@@ -979,6 +979,15 @@ if os.path.exists("kernel/Makefile"):
     with open("kernel/Makefile", "w", encoding="utf-8") as f:
         f.write(kmf)
     print("Neutralized special_opt in kernel/Makefile")
+
+# 40. Neutralize uxio_first in block/Makefile
+if os.path.exists("block/Makefile"):
+    with open("block/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        bmf = f.read()
+    bmf = re.sub(r'obj-\$\(CONFIG_OPLUS_FEATURE_UXIO_FIRST\)\s*\+=\s*uxio_first\/', '# obj-$(CONFIG_OPLUS_FEATURE_UXIO_FIRST) += uxio_first/', bmf)
+    with open("block/Makefile", "w", encoding="utf-8") as f:
+        f.write(bmf)
+    print("Neutralized uxio_first in block/Makefile")
 
 
 
