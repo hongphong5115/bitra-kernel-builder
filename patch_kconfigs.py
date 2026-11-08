@@ -820,11 +820,14 @@ if os.path.exists("drivers/usb/pd/policy_engine.c"):
 if os.path.exists("drivers/usb/pd/policy_engine.c"):
     with open("drivers/usb/pd/policy_engine.c", "r", encoding="utf-8", errors="ignore") as f:
         pec = f.read()
-    if "void oplus_wpc_set_wrx_en_value" not in pec:
-        pec += "\nvoid oplus_wpc_set_wrx_en_value(int val) {}\nEXPORT_SYMBOL(oplus_wpc_set_wrx_en_value);\n"
-        with open("drivers/usb/pd/policy_engine.c", "w", encoding="utf-8") as f:
-            f.write(pec)
-        print("Added oplus_wpc_set_wrx_en_value stub to policy_engine.c")
+    pec = re.sub(
+        r"extern\s+void\s+oplus_wpc_set_wrx_en_value\s*\([^)]*\)\s*;",
+        "void oplus_wpc_set_wrx_en_value(int value) {}\nEXPORT_SYMBOL(oplus_wpc_set_wrx_en_value);",
+        pec
+    )
+    with open("drivers/usb/pd/policy_engine.c", "w", encoding="utf-8") as f:
+        f.write(pec)
+    print("Replaced extern oplus_wpc_set_wrx_en_value with implementation in policy_engine.c")
 
 # 31. Fix kernel/panic_flush.c is_fulldump_enable
 if os.path.exists("kernel/panic_flush.c"):
