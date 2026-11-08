@@ -220,11 +220,11 @@ import shutil
 
 # 9.1 Replace dangling include/soc/oplus/system symlink with real directory
 oplus_sys = "include/soc/oplus/system"
-if os.path.islink(oplus_sys) or os.path.exists(oplus_sys):
+if os.path.islink(oplus_sys) and not os.path.exists(oplus_sys):
     try:
         os.remove(oplus_sys)
     except Exception:
-        shutil.rmtree(oplus_sys, ignore_errors=True)
+        pass
 os.makedirs(oplus_sys, exist_ok=True)
 os.makedirs("include/soc/oplus", exist_ok=True)
 os.makedirs("drivers/oplus", exist_ok=True)
@@ -275,8 +275,12 @@ if os.path.exists("include/soc/oppo"):
     for fname in os.listdir("include/soc/oppo"):
         src = os.path.join("include/soc/oppo", fname)
         if os.path.isfile(src):
-            safe_copy(src, os.path.join("include/soc/oplus/system", fname))
-            safe_copy(src, os.path.join("include/soc/oplus", fname))
+            dst_sys = os.path.join("include/soc/oplus/system", fname)
+            dst_op = os.path.join("include/soc/oplus", fname)
+            if not os.path.exists(dst_sys):
+                safe_copy(src, dst_sys)
+            if not os.path.exists(dst_op):
+                safe_copy(src, dst_op)
     print("Mirrored include/soc/oppo/* to include/soc/oplus/system/ and oplus/")
 
 empty_headers = [
@@ -839,9 +843,9 @@ if os.path.exists("drivers/usb/pd/policy_engine.c"):
 if os.path.exists("kernel/panic_flush.c"):
     with open("kernel/panic_flush.c", "r", encoding="utf-8", errors="ignore") as f:
         pfc = f.read()
-    pfc = pfc.replace("extern bool is_fulldump_enable(void);", "bool is_fulldump_enable(void) { return false; }")
-    if "bool is_fulldump_enable(void)" not in pfc:
-        pfc = "bool is_fulldump_enable(void) { return false; }\n" + pfc
+    pfc = pfc.replace("extern bool is_fulldump_enable(void);", "bool __attribute__((weak)) is_fulldump_enable(void) { return false; }")
+    if "is_fulldump_enable" not in pfc:
+        pfc = "bool __attribute__((weak)) is_fulldump_enable(void) { return false; }\n" + pfc
     with open("kernel/panic_flush.c", "w", encoding="utf-8") as f:
         f.write(pfc)
     print("Defined is_fulldump_enable in kernel/panic_flush.c")
