@@ -797,6 +797,25 @@ if os.path.exists("include/linux/hans.h"):
         f.write(hhc)
     print("Injected NETLINK_OPPO_HANS into include/linux/hans.h")
 
+# 29. Fix drivers/usb/pd/policy_engine.c undeclared pd_lobal
+if os.path.exists("drivers/usb/pd/policy_engine.c"):
+    with open("drivers/usb/pd/policy_engine.c", "r", encoding="utf-8", errors="ignore") as f:
+        pec = f.read()
+    pec = re.sub(
+        r"#ifdef\s+OPLUS_FEATURE_CHG_BASIC\s*\n\s*struct\s+usbpd\s*\*pd_lobal;\s*\n\s*#endif",
+        "struct usbpd *pd_lobal;",
+        pec
+    )
+    pec = re.sub(
+        r"#ifdef\s+OPLUS_FEATURE_CHG_BASIC\s*\n\s*pd_lobal\s*=\s*pd;\s*\n\s*#endif",
+        "pd_lobal = pd;",
+        pec
+    )
+    with open("drivers/usb/pd/policy_engine.c", "w", encoding="utf-8") as f:
+        f.write(pec)
+    print("Fixed drivers/usb/pd/policy_engine.c pd_lobal declaration")
+
+
 
 
 
