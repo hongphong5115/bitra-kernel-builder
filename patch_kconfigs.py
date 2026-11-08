@@ -1017,11 +1017,11 @@ if os.path.exists(tfa_path):
         tfac = f.read()
     tfac = tfac.replace(
         "#ifdef OPLUS_ARCH_EXTENDS\n\tint calibrate_done = 0;\n\tint speakerImpedance = 0;\n\t#endif /* OPLUS_ARCH_EXTENDS */",
-        "\tint calibrate_done = 0;\n\tint speakerImpedance = 0;"
+        "\tint speakerImpedance = 0;\n#ifdef OPLUS_ARCH_EXTENDS\n\tint calibrate_done = 0;\n#endif"
     )
     tfac = tfac.replace(
-        "struct device_node *np = i2c->dev.of_node;",
-        "struct device_node *np = i2c->dev.of_node;\n\t(void)np;"
+        'pr_info("%s: addr=0x%x\\n", __func__, i2c->addr);',
+        'pr_info("%s: addr=0x%x\\n", __func__, i2c->addr);\n\t(void)np;'
     )
     with open(tfa_path, "w", encoding="utf-8") as f:
         f.write(tfac)
