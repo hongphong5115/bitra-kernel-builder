@@ -132,3 +132,40 @@ for root, dirs, files in os.walk("."):
                 pass
 
 print(f"Universal Makefile scanner completed. Total missing OEM subdirs fixed: {mf_fixed_count}")
+
+# 7. Comment out any missing healthinfo includes across the tree
+hi_count = 0
+for root, dirs, files in os.walk("."):
+    for f in files:
+        if f.endswith(".c") or f.endswith(".h"):
+            c_path = os.path.join(root, f)
+            try:
+                with open(c_path, "r", encoding="utf-8", errors="ignore") as cf:
+                    ccontent = cf.read()
+                if "linux/healthinfo/" in ccontent:
+                    ccontent = re.sub(r'#include\s*<linux/healthinfo/[^>]+>', '// [DISABLED MISSING OEM HEADER]', ccontent)
+                    with open(c_path, "w", encoding="utf-8") as cf:
+                        cf.write(ccontent)
+                    print(f"Disabled missing healthinfo include in {c_path}")
+                    hi_count += 1
+            except Exception:
+                pass
+print(f"Disabled missing healthinfo includes: {hi_count}")
+
+# 8. Fix Realme broken syntax in fs/pstore/ram.c
+if os.path.exists("fs/pstore/ram.c"):
+    with open("fs/pstore/ram.c", "r", encoding="utf-8", errors="ignore") as f:
+        ramc = f.read()
+    ramc = re.sub(
+        r"if\s*\(!pdata->mem_size\s*\|\|\s*\(!pdata->record_size\s*&&[\s\S]*?!pdata->device_info_size\)\)\s*\{[\s\S]*?#endif[^\n]*",
+        "if (!pdata->mem_size || (!pdata->record_size && !pdata->console_size && !pdata->ftrace_size && !pdata->pmsg_size)) {",
+        ramc
+    )
+    ramc = re.sub(
+        r"dump_mem_sz\s*=\s*cxt->size\s*-\s*cxt->console_size\s*-\s*cxt->ftrace_size[\s\S]*?#endif[^\n]*",
+        "dump_mem_sz = cxt->size - cxt->console_size - cxt->ftrace_size - cxt->pmsg_size;",
+        ramc
+    )
+    with open("fs/pstore/ram.c", "w", encoding="utf-8") as f:
+        f.write(ramc)
+    print("Fixed fs/pstore/ram.c syntax")
