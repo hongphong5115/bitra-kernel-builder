@@ -406,3 +406,25 @@ if os.path.exists("kernel/sysctl.c"):
     with open("kernel/sysctl.c", "w", encoding="utf-8") as f:
         f.write(scc)
     print("Fixed kernel/sysctl.c two_hundred declaration")
+
+# 15. Fix drivers/iio/adc/qcom-spmi-adc5.c battemp_for_adc field
+if os.path.exists("drivers/iio/adc/qcom-spmi-adc5.c"):
+    with open("drivers/iio/adc/qcom-spmi-adc5.c", "r", encoding="utf-8", errors="ignore") as f:
+        adcc = f.read()
+    adcc = adcc.replace(".battemp_for_adc = 1,", "/* .battemp_for_adc = 1 */")
+    with open("drivers/iio/adc/qcom-spmi-adc5.c", "w", encoding="utf-8") as f:
+        f.write(adcc)
+    print("Fixed drivers/iio/adc/qcom-spmi-adc5.c battemp_for_adc field")
+
+# 16. Fix net/oplus_nwpower/oplus_nwpower.c get_cached_platform_id / LAGOON
+if os.path.exists("net/oplus_nwpower/oplus_nwpower.c"):
+    with open("net/oplus_nwpower/oplus_nwpower.c", "r", encoding="utf-8", errors="ignore") as f:
+        nwc = f.read()
+    nwc = re.sub(
+        r"bool bts_net_exist\(void\)\s*\{[\s\S]*?return bts_net_wakeup_buffer\[0\] == 0 \? false : true;\s*\}",
+        "bool bts_net_exist(void)\n{\n\treturn bts_net_wakeup_buffer[0] == 0 ? false : true;\n}",
+        nwc
+    )
+    with open("net/oplus_nwpower/oplus_nwpower.c", "w", encoding="utf-8") as f:
+        f.write(nwc)
+    print("Fixed net/oplus_nwpower/oplus_nwpower.c get_cached_platform_id")
