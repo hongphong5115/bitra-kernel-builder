@@ -1097,32 +1097,44 @@ if os.path.exists(swr_path):
     with open(swr_path, "r", encoding="utf-8", errors="ignore") as f:
         swrc = f.read()
     swrc = swrc.replace(
-        "status = swr_master_read(swrm, SWRM_MCP_SLV_STATUS);",
-        "status = swr_master_read(swrm, SWRM_MCP_SLV_STATUS);\n\t(void)temp;"
+        "static void swrm_enable_slave_irq(struct swr_mstr_ctrl *swrm)\n{\n\tint i;\n\tint status = 0;\n\tu32 temp;",
+        "static void swrm_enable_slave_irq(struct swr_mstr_ctrl *swrm)\n{\n\tint i;\n\tint status = 0;\n\tu32 __maybe_unused temp;"
     )
     with open(swr_path, "w", encoding="utf-8") as f:
         f.write(swrc)
     print("Fixed unused temp in swr-mstr-ctrl.c")
 
-# 47. Fix trigger_id in techpack/camera/drivers/cam_isp/cam_isp_context.c
-isp_path = "techpack/camera/drivers/cam_isp/cam_isp_context.c"
-if os.path.exists(isp_path):
-    with open(isp_path, "r", encoding="utf-8", errors="ignore") as f:
-        ispc = f.read()
-    target_trig = """#ifdef OPLUS_FEATURE_CAMERA_COMMON
-\t\t\tnotify.req_id = ctx_isp->req_info.last_bufdone_req_id;
+# 47. Fix trigger_id in techpack/camera/drivers/cam_req_mgr/cam_req_mgr_interface.h
+crm_h_path = "techpack/camera/drivers/cam_req_mgr/cam_req_mgr_interface.h"
+if os.path.exists(crm_h_path):
+    with open(crm_h_path, "r", encoding="utf-8", errors="ignore") as f:
+        crmh = f.read()
+    target_crm = """struct cam_req_mgr_trigger_notify {
+\tint32_t  link_hdl;
+\tint32_t  dev_hdl;
+\tint64_t  frame_id;
+\tuint32_t trigger;
+\tuint64_t sof_timestamp_val;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+\tuint64_t req_id;
+\tint32_t  trigger_id;
 #endif
-\t\t\tnotify.sof_timestamp_val = ctx_isp->sof_timestamp_val;
-\t\t\tnotify.trigger_id = ctx_isp->trigger_id;"""
-    repl_trig = """#ifdef OPLUS_FEATURE_CAMERA_COMMON
-\t\t\tnotify.req_id = ctx_isp->req_info.last_bufdone_req_id;
-\t\t\tnotify.trigger_id = ctx_isp->trigger_id;
+};"""
+    repl_crm = """struct cam_req_mgr_trigger_notify {
+\tint32_t  link_hdl;
+\tint32_t  dev_hdl;
+\tint64_t  frame_id;
+\tuint32_t trigger;
+\tuint64_t sof_timestamp_val;
+\tint32_t  trigger_id;
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+\tuint64_t req_id;
 #endif
-\t\t\tnotify.sof_timestamp_val = ctx_isp->sof_timestamp_val;"""
-    ispc = ispc.replace(target_trig, repl_trig)
-    with open(isp_path, "w", encoding="utf-8") as f:
-        f.write(ispc)
-    print("Fixed trigger_id in cam_isp_context.c")
+};"""
+    crmh = crmh.replace(target_crm, repl_crm)
+    with open(crm_h_path, "w", encoding="utf-8") as f:
+        f.write(crmh)
+    print("Fixed trigger_id in cam_req_mgr_interface.h")
 
 
 
