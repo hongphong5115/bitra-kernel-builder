@@ -101,6 +101,16 @@ jobs:
         sed -i '/CONFIG_STMVL53L1/d' arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_STMVL53L1=n" >> arch/arm64/configs/$DEFCONFIG
         
+        # Disable proprietary unbuildable UFSFEATURE add-on
+        sed -i '/CONFIG_UFSFEATURE/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_UFSFEATURE=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_UFSHPB/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_UFSHPB=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_UFSTW/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_UFSTW=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_UFSHID/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_UFSHID=n" >> arch/arm64/configs/$DEFCONFIG
+        
         # Enable SuSFS
         echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/$DEFCONFIG

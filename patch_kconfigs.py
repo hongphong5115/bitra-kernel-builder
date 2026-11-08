@@ -549,17 +549,43 @@ if os.path.exists("drivers/power/supply/qcom/qpnp-fg-gen4.c"):
         f.write(fgc)
     print("Fixed drivers/power/supply/qcom/qpnp-fg-gen4.c batt_therm_chan declaration")
 
-# 22. Fix drivers/scsi/ufs/ufshcd.h non-static declarations when OPLUS_FEATURE_UFSPLUS is not set
+# 22. Disable unbuildable proprietary UFSFEATURE / UFSPLUS add-on
+# In Realme kernel, CONFIG_UFSFEATURE references missing UFSFEATURE_QUERY_OPCODE and creates static/non-static conflicts in ufshcd
+for defcfg in ["arch/arm64/configs/vendor/kona-perf_defconfig", "arch/arm64/configs/vendor/kona_defconfig"]:
+    if os.path.exists(defcfg):
+        with open(defcfg, "r", encoding="utf-8", errors="ignore") as f:
+            dc = f.read()
+        dc = re.sub(r"CONFIG_UFSFEATURE=y", "CONFIG_UFSFEATURE=n", dc)
+        dc = re.sub(r"CONFIG_UFSHPB=y", "CONFIG_UFSHPB=n", dc)
+        dc = re.sub(r"CONFIG_UFSTW=y", "CONFIG_UFSTW=n", dc)
+        dc = re.sub(r"CONFIG_UFSHID=y", "CONFIG_UFSHID=n", dc)
+        with open(defcfg, "w", encoding="utf-8") as f:
+            f.write(dc)
+        print(f"Disabled CONFIG_UFSFEATURE in {defcfg}")
+
+if os.path.exists("drivers/scsi/ufs/Makefile"):
+    with open("drivers/scsi/ufs/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        umk = f.read()
+    umk = re.sub(r"(\bobj-\$\(CONFIG_UFSFEATURE\)\s*\+=\s*ufsfeature\.o)", r"# \1", umk)
+    umk = re.sub(r"(\bobj-\$\(CONFIG_UFSHPB\)\s*\+=\s*ufshpb\.o)", r"# \1", umk)
+    umk = re.sub(r"(\bobj-\$\(CONFIG_UFSTW\)\s*\+=\s*ufstw\.o)", r"# \1", umk)
+    umk = re.sub(r"(\bobj-\$\(CONFIG_UFSHID\)\s*\+=\s*ufshid\.o)", r"# \1", umk)
+    with open("drivers/scsi/ufs/Makefile", "w", encoding="utf-8") as f:
+        f.write(umk)
+    print("Disabled ufsfeature in drivers/scsi/ufs/Makefile")
+
 if os.path.exists("drivers/scsi/ufs/ufshcd.h"):
     with open("drivers/scsi/ufs/ufshcd.h", "r", encoding="utf-8", errors="ignore") as f:
         uhc = f.read()
-    uhc = uhc.replace(
-        "#if defined(CONFIG_UFSFEATURE)\nint ufshcd_exec_dev_cmd",
-        "#if defined(CONFIG_UFSFEATURE) && defined(OPLUS_FEATURE_UFSPLUS)\nint ufshcd_exec_dev_cmd"
+    uhc = re.sub(
+        r"#if defined\(CONFIG_UFSFEATURE\)[\s\S]*?#endif",
+        "/* [DISABLED UFSFEATURE extern declarations] */",
+        uhc
     )
     with open("drivers/scsi/ufs/ufshcd.h", "w", encoding="utf-8") as f:
         f.write(uhc)
-    print("Fixed drivers/scsi/ufs/ufshcd.h UFSFEATURE declarations")
+    print("Neutralized UFSFEATURE declarations in drivers/scsi/ufs/ufshcd.h")
+
 
 
 
