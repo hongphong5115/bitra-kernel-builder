@@ -1,0 +1,163 @@
+name: Build Bitra Ultimate Kernel (KernelSU-Next + SuSFS + NoMount + BBR)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build Ultimate Kernel
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          bc bison build-essential ca-certificates ccache clang curl flex git \
+          gnupg libelf-dev libssl-dev libtinfo5 libncurses5 lz4 make python3 python-is-python3 unzip zip wget
+
+    - name: Download ZyCromerZ Clang 10.0.1
+      run: |
+        mkdir -p clang-10
+        wget -c https://github.com/ZyCromerZ/Clang/releases/download/10.0.1-20220724-release/Clang-10.0.1-20220724.tar.gz
+        tar -xzf Clang-10.0.1-20220724.tar.gz -C clang-10
+        rm -f Clang-10.0.1-20220724.tar.gz
+
+    - name: Clone Realme GT Neo 2 (rui4.0) Kernel Source
+      run: |
+        echo "Cloning ermyltsor/android_kernel_realme_sm8250 (branch: rui4.0)..."
+        git clone --depth=1 https://github.com/ermyltsor/android_kernel_realme_sm8250.git -b rui4.0 kernel_src
+
+    - name: Apply KernelSU-Next, NoMount & SuSFS
+      run: |
+        cd kernel_src
+        
+        # 1. Apply OEM fixes and universal Kconfig cleanup via python helper
+        python3 ../patch_kconfigs.py
+        
+        # 2. Integrate KernelSU-Next (native SuSFS support)
+        echo "Integrating KernelSU-Next..."
+        curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
+        
+        # 3. Apply NoMount built-in driver
+        echo "Applying NoMount integration..."
+        curl -s https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh | bash -s -- dev
+        
+        # 4. Check if SuSFS patch exists and apply
+        if [ -f "../50_add_susfs_in_kernel-4.19.patch" ]; then
+          echo "Applying SuSFS 4.19 patch..."
+          patch -p1 < ../50_add_susfs_in_kernel-4.19.patch || true
+          [ -f "../fs/susfs.c" ] && cp ../fs/susfs.c fs/
+          [ -f "../include/linux/susfs.h" ] && cp ../include/linux/susfs.h include/linux/
+          [ -f "../include/linux/susfs_def.h" ] && cp ../include/linux/susfs_def.h include/linux/
+          [ -f "../include/linux/sus_su.h" ] && cp ../include/linux/sus_su.h include/linux/
+        fi
+        
+        # 5. Conceal NoMount and KSU symbols in kallsyms
+        if grep -q "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS" kernel/kallsyms.c; then
+          sed -i 's/!strncmp(iter->name, "ksud", 4)/!strncmp(iter->name, "ksud", 4) || !strncmp(iter->name, "nm_", 3) || !strncmp(iter->name, "nomount_", 8)/g' kernel/kallsyms.c
+        fi
+
+    - name: Configure Kernel Defconfig
+      run: |
+        cd kernel_src
+        DEFCONFIG=vendor/kona-perf_defconfig
+        [ ! -f "arch/arm64/configs/$DEFCONFIG" ] && DEFCONFIG=vendor/kona_defconfig
+        
+        # --- Root & Stealth Features ---
+        echo "CONFIG_64BIT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_OVERLAY_FS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KEYS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KEYS_COMPAT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/$DEFCONFIG
+        
+        # --- KernelSU-Next & SuSFS ---
+        echo "CONFIG_KSU=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> arch/arm64/configs/$DEFCONFIG
+        
+        # --- Google BBR v2 / BBR TCP Congestion Control ---
+        echo "CONFIG_TCP_CONG_BBR=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_DEFAULT_TCP_CONG=\"bbr\"" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_NET_SCH_FQ=y" >> arch/arm64/configs/$DEFCONFIG
+        
+        # --- Anti-Bufferbloat Low Ping Packet Schedulers ---
+        echo "CONFIG_NET_SCH_CAKE=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_NET_SCH_FQ_CODEL=y" >> arch/arm64/configs/$DEFCONFIG
+        
+        # --- WireGuard Built-in ---
+        echo "CONFIG_WIREGUARD=y" >> arch/arm64/configs/$DEFCONFIG
+        
+        # --- ZRAM & Multi-Stream Compression ---
+        echo "CONFIG_ZRAM=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_ZRAM_DEF_COMP_LZ4=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_CRYPTO_LZ4=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_CRYPTO_ZSTD=y" >> arch/arm64/configs/$DEFCONFIG
+        
+        # --- Disable Unbuildable OEM Debug Sensors ---
+        sed -i '/CONFIG_STMVL53L1/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_STMVL53L1=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_UFSFEATURE/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_UFSFEATURE=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_UFSHPB/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_UFSHPB=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_UFSTW/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_UFSTW=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_UFSHID/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_UFSHID=n" >> arch/arm64/configs/$DEFCONFIG
+
+    - name: Compile Ultimate Kernel
+      run: |
+        cd kernel_src
+        export CLANG_PATH="$(pwd)/../clang-10/bin"
+        export PATH="$CLANG_PATH:$PATH"
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        
+        DEFCONFIG=vendor/kona-perf_defconfig
+        [ ! -f "arch/arm64/configs/$DEFCONFIG" ] && DEFCONFIG=vendor/kona_defconfig
+        
+        MAKE_FLAGS="ARCH=arm64 AR=llvm-ar CC=clang NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip LLVM=1 O=out"
+        
+        make $MAKE_FLAGS $DEFCONFIG
+        make $MAKE_FLAGS -j$(nproc --all) Image dtbs
+
+    - name: Package AnyKernel3
+      run: |
+        git clone --depth=1 https://github.com/ermyltsor/AnyKernel3.git anykernel
+        rm -rf anykernel/.git
+        
+        IMAGE_OUT=kernel_src/out/arch/arm64/boot
+        
+        # Copy compiled Image, DTB, and DTBO
+        cp "$IMAGE_OUT/Image" anykernel/
+        [ -f "$IMAGE_OUT/dtb" ] && cp "$IMAGE_OUT/dtb" anykernel/
+        [ -f "$IMAGE_OUT/dtbo.img" ] && cp "$IMAGE_OUT/dtbo.img" anykernel/
+        
+        # Customize AnyKernel3 banner
+        sed -i 's/kernel.string=.*/kernel.string=Ultimate KernelSU-Next + SuSFS + NoMount (Realme GT Neo 2)/g' anykernel/anykernel.sh
+        
+        cd anykernel
+        zip -r9 ../AnyKernel3-Ultimate-bitra.zip * -x README.md
+
+    - name: Upload Kernel Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AnyKernel3-Ultimate-bitra
+        path: |
+          AnyKernel3-Ultimate-bitra.zip
+          kernel_src/out/arch/arm64/boot/Image

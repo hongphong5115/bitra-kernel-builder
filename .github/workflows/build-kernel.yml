@@ -11,9 +11,6 @@ on:
         description: 'Kernel branch'
         required: true
         default: 'master'
-  push:
-    branches:
-      - master
 
 jobs:
   build:
