@@ -502,4 +502,29 @@ if os.path.exists("drivers/mmc/core/Makefile"):
             f.write(mcc)
         print("Added -DOPLUS_FEATURE_EMMC_SDCARD_OPTIMIZE to drivers/mmc/core/Makefile")
 
+# 19. Fix drivers/nfc/nq-nci.c undeclared nci_reset_ntf and missing OPLUS_BUG_STABILITY
+if os.path.exists("drivers/nfc/nq-nci.c"):
+    with open("drivers/nfc/nq-nci.c", "r", encoding="utf-8", errors="ignore") as f:
+        nc = f.read()
+    if "#define OPLUS_BUG_STABILITY" not in nc:
+        nc = "#define OPLUS_BUG_STABILITY 1\n" + nc
+    nc = re.sub(
+        r"ret\s*=\s*i2c_master_recv\s*\(\s*client\s*,\s*nci_reset_ntf\s*,\s*NCI_RESET_NTF_LEN\s*\);",
+        "/* ret = i2c_master_recv(client, nci_reset_ntf, NCI_RESET_NTF_LEN); */",
+        nc
+    )
+    with open("drivers/nfc/nq-nci.c", "w", encoding="utf-8") as f:
+        f.write(nc)
+    print("Fixed drivers/nfc/nq-nci.c OPLUS_BUG_STABILITY and nci_reset_ntf")
+
+if os.path.exists("drivers/nfc/Makefile"):
+    with open("drivers/nfc/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        nmk = f.read()
+    if "OPLUS_BUG_STABILITY" not in nmk:
+        nmk = "ccflags-y += -DOPLUS_BUG_STABILITY\n" + nmk
+        with open("drivers/nfc/Makefile", "w", encoding="utf-8") as f:
+            f.write(nmk)
+        print("Added -DOPLUS_BUG_STABILITY to drivers/nfc/Makefile")
+
+
 
