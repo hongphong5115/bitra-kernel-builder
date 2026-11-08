@@ -336,3 +336,16 @@ if os.path.exists("kernel/printk/printk.c"):
     with open("kernel/printk/printk.c", "w", encoding="utf-8") as f:
         f.write(pkc)
     print("Fixed kernel/printk/printk.c OEM UART skip")
+
+# 12. Fix kernel/sched/fair.c dangling trace_sched_cpu_sel call
+if os.path.exists("kernel/sched/fair.c"):
+    with open("kernel/sched/fair.c", "r", encoding="utf-8", errors="ignore") as f:
+        fc = f.read()
+    fc = re.sub(
+        r"\btrace_sched_cpu_sel\s*\([\s\S]*?start_cpu\);",
+        "/* [DISABLED OEM trace_sched_cpu_sel] */",
+        fc
+    )
+    with open("kernel/sched/fair.c", "w", encoding="utf-8") as f:
+        f.write(fc)
+    print("Fixed kernel/sched/fair.c dangling trace_sched_cpu_sel call")
