@@ -26,21 +26,8 @@ except Exception:
     pass
 print("Rewrote scripts/gcc-wrapper.py as pass-through")
 
-# 3. Fix broken awk logic in OplusKernelEnvConfig.mk
-if os.path.exists("OplusKernelEnvConfig.mk"):
-    with open("OplusKernelEnvConfig.mk", "r", encoding="utf-8", errors="ignore") as f:
-        lines = f.readlines()
-    new_lines = []
-    skip = False
-    for line in lines:
-        if "OPLUS_FEATURE_POWERINFO_STANDBY" in line:
-            skip = not skip # toggle block skip
-            continue
-        if not skip:
-            new_lines.append(line)
-    with open("OplusKernelEnvConfig.mk", "w", encoding="utf-8") as f:
-        f.writelines(new_lines)
-    print("Cleaned OplusKernelEnvConfig.mk powerinfo block")
+# 3. OplusKernelEnvConfig.mk - preserved intact to maintain all OEM build flags
+print("Preserved OplusKernelEnvConfig.mk intact")
 
 # 4. Universal Dangling OEM Symlink & Dummy Gitlink Cleaner
 import shutil
