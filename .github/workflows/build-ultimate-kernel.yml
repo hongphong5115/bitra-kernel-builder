@@ -128,6 +128,8 @@ jobs:
         echo "CONFIG_DUMP_TASKS_MEM=n" >> arch/arm64/configs/$DEFCONFIG
         sed -i '/CONFIG_PROCESS_RECLAIM_ENHANCE/d' arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_PROCESS_RECLAIM_ENHANCE=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_VIRTUAL_RESERVE_MEMORY/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_VIRTUAL_RESERVE_MEMORY=n" >> arch/arm64/configs/$DEFCONFIG
 
     - name: Compile Ultimate Kernel
       run: |

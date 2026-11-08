@@ -933,7 +933,7 @@ for dc in [
 ]:
     if os.path.exists(dc):
         with open(dc, "a", encoding="utf-8") as f:
-            f.write("\nCONFIG_OPLUS_HEALTHINFO=n\nCONFIG_OPLUS_JANK_INFO=n\nCONFIG_DUMP_TASKS_MEM=n\nCONFIG_PROCESS_RECLAIM_ENHANCE=n\n")
+            f.write("\nCONFIG_OPLUS_HEALTHINFO=n\nCONFIG_OPLUS_JANK_INFO=n\nCONFIG_DUMP_TASKS_MEM=n\nCONFIG_PROCESS_RECLAIM_ENHANCE=n\nCONFIG_VIRTUAL_RESERVE_MEMORY=n\n")
 
 # 37. Fix kswapd_unbind_cpu in kernel/sched/core.c and include/linux/swap.h
 if os.path.exists("kernel/sched/core.c"):
@@ -957,17 +957,18 @@ if os.path.exists("include/linux/swap.h"):
             f.write(swh)
         print("Injected extern kswapd_unbind_cpu into include/linux/swap.h")
 
-# 38. Neutralize healthinfo, task_mem, and process_mm_reclaim in mm/Makefile
+# 38. Neutralize healthinfo, task_mem, process_mm_reclaim, and reserve_area in mm/Makefile
 if os.path.exists("mm/Makefile"):
     with open("mm/Makefile", "r", encoding="utf-8", errors="ignore") as f:
         mmf = f.read()
     mmf = re.sub(r'obj-y\s*\+=\s*healthinfo\/', '# obj-y += healthinfo/', mmf)
     mmf = re.sub(r'obj-y\s*\+=\s*task_mem\/', '# obj-y += task_mem/', mmf)
     mmf = re.sub(r'obj-\$\(CONFIG_DUMP_TASKS_MEM\)\s*\+=\s*task_mem\/', '# obj-$(CONFIG_DUMP_TASKS_MEM) += task_mem/', mmf)
+    mmf = re.sub(r'obj-\$\(CONFIG_VIRTUAL_RESERVE_MEMORY\)\s*\+=\s*reserve_area\.o', '# obj-$(CONFIG_VIRTUAL_RESERVE_MEMORY) += reserve_area.o', mmf)
     mmf = mmf.replace("process_mm_reclaim.o", "process_mm_reclaim_weak.o")
     with open("mm/Makefile", "w", encoding="utf-8") as f:
         f.write(mmf)
-    print("Neutralized healthinfo, task_mem, and switched to process_mm_reclaim_weak in mm/Makefile")
+    print("Neutralized healthinfo, task_mem, reserve_area, and switched to process_mm_reclaim_weak in mm/Makefile")
 
 # 39. Neutralize special_opt in kernel/Makefile
 if os.path.exists("kernel/Makefile"):
