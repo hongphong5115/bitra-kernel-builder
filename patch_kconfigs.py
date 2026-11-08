@@ -536,14 +536,6 @@ if os.path.exists("include/linux/input/qpnp-power-on.h"):
         f.write(qpc)
     print("Fixed include/linux/input/qpnp-power-on.h PON_RESTART_REASON_NORMAL")
 
-if os.path.exists("drivers/power/reset/msm-poweroff.c"):
-    with open("drivers/power/reset/msm-poweroff.c", "r", encoding="utf-8", errors="ignore") as f:
-        mpc = f.read()
-    if "PON_RESTART_REASON_NORMAL" not in mpc[:1000]:
-        mpc = "#ifndef PON_RESTART_REASON_NORMAL\n#define PON_RESTART_REASON_NORMAL 0x3E\n#endif\n" + mpc
-        with open("drivers/power/reset/msm-poweroff.c", "w", encoding="utf-8") as f:
-            f.write(mpc)
-        print("Defined PON_RESTART_REASON_NORMAL in drivers/power/reset/msm-poweroff.c")
 
 
 
