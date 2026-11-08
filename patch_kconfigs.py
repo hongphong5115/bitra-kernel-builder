@@ -349,3 +349,16 @@ if os.path.exists("kernel/sched/fair.c"):
     with open("kernel/sched/fair.c", "w", encoding="utf-8") as f:
         f.write(fc)
     print("Fixed kernel/sched/fair.c dangling trace_sched_cpu_sel call")
+
+# 13. Fix kernel/exit.c dangling is_critial_process call
+if os.path.exists("kernel/exit.c"):
+    with open("kernel/exit.c", "r", encoding="utf-8", errors="ignore") as f:
+        ec = f.read()
+    ec = re.sub(
+        r"//\s*#ifdef OPLUS_BUG_STABILITY[\s\S]*?is_critial_process[\s\S]*?//\s*#endif[^\n]*",
+        "/* [DISABLED OEM is_critial_process] */",
+        ec
+    )
+    with open("kernel/exit.c", "w", encoding="utf-8") as f:
+        f.write(ec)
+    print("Fixed kernel/exit.c dangling is_critial_process call")
