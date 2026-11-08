@@ -120,6 +120,10 @@ jobs:
         echo "CONFIG_UFSTW=n" >> arch/arm64/configs/$DEFCONFIG
         sed -i '/CONFIG_UFSHID/d' arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_UFSHID=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_OPLUS_HEALTHINFO/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_OPLUS_HEALTHINFO=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_OPLUS_JANK_INFO/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_OPLUS_JANK_INFO=n" >> arch/arm64/configs/$DEFCONFIG
 
     - name: Compile Ultimate Kernel
       run: |

@@ -913,6 +913,23 @@ if os.path.exists("drivers/soc/qcom/watchdog_v2.c"):
         f.write(wdc)
     print("Fixed drivers/soc/qcom/watchdog_v2.c cpu_idle_pc_state declaration")
 
+# 36. Neutralize healthinfo in fs/proc/Makefile and defconfigs
+if os.path.exists("fs/proc/Makefile"):
+    with open("fs/proc/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        pmf = f.read()
+    pmf = re.sub(r'obj-y\s*\+=\s*healthinfo\/', '# obj-y += healthinfo/', pmf)
+    with open("fs/proc/Makefile", "w", encoding="utf-8") as f:
+        f.write(pmf)
+    print("Neutralized healthinfo in fs/proc/Makefile")
+
+for dc in [
+    "arch/arm64/configs/vendor/kona-perf_defconfig",
+    "arch/arm64/configs/vendor/kona_defconfig"
+]:
+    if os.path.exists(dc):
+        with open(dc, "a", encoding="utf-8") as f:
+            f.write("\nCONFIG_OPLUS_HEALTHINFO=n\nCONFIG_OPLUS_JANK_INFO=n\n")
+
 
 
 
