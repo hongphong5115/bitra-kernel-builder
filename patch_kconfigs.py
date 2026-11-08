@@ -929,7 +929,7 @@ for dc in [
 ]:
     if os.path.exists(dc):
         with open(dc, "a", encoding="utf-8") as f:
-            f.write("\nCONFIG_OPLUS_HEALTHINFO=n\nCONFIG_OPLUS_JANK_INFO=n\n")
+            f.write("\nCONFIG_OPLUS_HEALTHINFO=n\nCONFIG_OPLUS_JANK_INFO=n\nCONFIG_DUMP_TASKS_MEM=n\n")
 
 # 37. Fix kswapd_unbind_cpu in kernel/sched/core.c and include/linux/swap.h
 if os.path.exists("kernel/sched/core.c"):
@@ -953,14 +953,16 @@ if os.path.exists("include/linux/swap.h"):
             f.write(swh)
         print("Injected extern kswapd_unbind_cpu into include/linux/swap.h")
 
-# 38. Neutralize healthinfo in mm/Makefile
+# 38. Neutralize healthinfo and task_mem in mm/Makefile
 if os.path.exists("mm/Makefile"):
     with open("mm/Makefile", "r", encoding="utf-8", errors="ignore") as f:
         mmf = f.read()
     mmf = re.sub(r'obj-y\s*\+=\s*healthinfo\/', '# obj-y += healthinfo/', mmf)
+    mmf = re.sub(r'obj-y\s*\+=\s*task_mem\/', '# obj-y += task_mem/', mmf)
+    mmf = re.sub(r'obj-\$\(CONFIG_DUMP_TASKS_MEM\)\s*\+=\s*task_mem\/', '# obj-$(CONFIG_DUMP_TASKS_MEM) += task_mem/', mmf)
     with open("mm/Makefile", "w", encoding="utf-8") as f:
         f.write(mmf)
-    print("Neutralized healthinfo in mm/Makefile")
+    print("Neutralized healthinfo and task_mem in mm/Makefile")
 
 # 39. Neutralize special_opt in kernel/Makefile
 if os.path.exists("kernel/Makefile"):

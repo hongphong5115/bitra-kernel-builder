@@ -124,6 +124,8 @@ jobs:
         echo "CONFIG_OPLUS_HEALTHINFO=n" >> arch/arm64/configs/$DEFCONFIG
         sed -i '/CONFIG_OPLUS_JANK_INFO/d' arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_OPLUS_JANK_INFO=n" >> arch/arm64/configs/$DEFCONFIG
+        sed -i '/CONFIG_DUMP_TASKS_MEM/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_DUMP_TASKS_MEM=n" >> arch/arm64/configs/$DEFCONFIG
 
     - name: Compile Ultimate Kernel
       run: |
