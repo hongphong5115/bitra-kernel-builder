@@ -1010,7 +1010,7 @@ if os.path.exists(ak_path):
         f.write(akc)
     print("Fixed unused variable ret2 in ak4376.c")
 
-# 43. Fix tfa98xx_v6.c speakerImpedance and np
+# 43. Fix tfa98xx_v6.c speakerImpedance, np, and unused tfa98xx_parse_dt
 tfa_path = "techpack/audio/asoc/codecs/tfa98xx-v6/tfa98xx_v6.c"
 if os.path.exists(tfa_path):
     with open(tfa_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -1023,9 +1023,13 @@ if os.path.exists(tfa_path):
         'pr_info("%s: addr=0x%x\\n", __func__, i2c->addr);',
         'pr_info("%s: addr=0x%x\\n", __func__, i2c->addr);\n\t(void)np;'
     )
+    tfac = tfac.replace(
+        "static int tfa98xx_parse_dt(",
+        "static int __maybe_unused tfa98xx_parse_dt("
+    )
     with open(tfa_path, "w", encoding="utf-8") as f:
         f.write(tfac)
-    print("Fixed speakerImpedance and np in tfa98xx_v6.c")
+    print("Fixed speakerImpedance, np, and tfa98xx_parse_dt in tfa98xx_v6.c")
 
 # 44. Fix cam_cpas_hw.c num_camnoc_axi_ports
 cpas_path = "techpack/camera/drivers/cam_cpas/cam_cpas_hw.c"
