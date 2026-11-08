@@ -638,6 +638,15 @@ static inline int mm_fb_kevent(int event_id, const char *fmt, ...) { return 0; }
 """)
 
 # 24.3 boot_mode.h, oppo_project.h, oplus_project.h
+if os.path.exists("include/soc/oppo/oppo_project.h"):
+    with open("include/soc/oppo/oppo_project.h", "r", encoding="utf-8", errors="ignore") as f:
+        opc = f.read()
+    if "oplus_daily_build" not in opc:
+        opc += "\n#define oplus_daily_build oppo_daily_build\n"
+        with open("include/soc/oppo/oppo_project.h", "w", encoding="utf-8") as f:
+            f.write(opc)
+    print("Added oplus_daily_build alias to include/soc/oppo/oppo_project.h")
+
 with open(os.path.join(sys_dir, "boot_mode.h"), "w", encoding="utf-8") as f:
     f.write("""#ifndef _SOC_OPLUS_BOOT_MODE_H_
 #define _SOC_OPLUS_BOOT_MODE_H_
@@ -653,6 +662,9 @@ with open(os.path.join(sys_dir, "oppo_project.h"), "w", encoding="utf-8") as f:
 #if __has_include(<soc/oppo/oppo_project.h>)
 #include <soc/oppo/oppo_project.h>
 #endif
+#ifndef oplus_daily_build
+#define oplus_daily_build oppo_daily_build
+#endif
 #endif
 """)
 
@@ -661,6 +673,9 @@ with open(os.path.join(sys_dir, "oplus_project.h"), "w", encoding="utf-8") as f:
 #define _SOC_OPLUS_OPLUS_PROJECT_H_
 #if __has_include(<soc/oppo/oppo_project.h>)
 #include <soc/oppo/oppo_project.h>
+#endif
+#ifndef oplus_daily_build
+#define oplus_daily_build oppo_daily_build
 #endif
 #endif
 """)
