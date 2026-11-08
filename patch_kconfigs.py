@@ -536,6 +536,20 @@ if os.path.exists("include/linux/input/qpnp-power-on.h"):
         f.write(qpc)
     print("Fixed include/linux/input/qpnp-power-on.h PON_RESTART_REASON_NORMAL")
 
+# 21. Fix drivers/power/supply/qcom/qpnp-fg-gen4.c undeclared batt_therm_chan in struct fg_gen4_chip
+if os.path.exists("drivers/power/supply/qcom/qpnp-fg-gen4.c"):
+    with open("drivers/power/supply/qcom/qpnp-fg-gen4.c", "r", encoding="utf-8", errors="ignore") as f:
+        fgc = f.read()
+    fgc = re.sub(
+        r"#ifdef\s+OPLUS_FEATURE_CHG_BASIC\s*\n\s*struct\s+iio_channel\s*\*batt_therm_chan;\s*\n\s*#endif",
+        "\tstruct iio_channel\t*batt_therm_chan; /* Unconditional for batt-therm channel */",
+        fgc
+    )
+    with open("drivers/power/supply/qcom/qpnp-fg-gen4.c", "w", encoding="utf-8") as f:
+        f.write(fgc)
+    print("Fixed drivers/power/supply/qcom/qpnp-fg-gen4.c batt_therm_chan declaration")
+
+
 
 
 
