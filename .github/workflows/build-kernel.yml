@@ -29,7 +29,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends \
           bc bison build-essential ca-certificates ccache clang curl flex git \
-          gnupg libelf-dev libssl-dev lz4 make python3 unzip zip
+          gnupg libelf-dev libssl-dev libtinfo5 libncurses5 lz4 make python3 python-is-python3 unzip zip
 
     - name: Download Toolchains
       run: |
@@ -44,12 +44,12 @@ jobs:
         rm -rf clang_repo
         
         # Download AArch64 GCC 4.9
-        echo "Downloading AArch64 GCC 4.9..."
-        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 gcc-arm64
+        echo "Downloading AArch64 GCC 4.9 (android10-release)..."
+        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 -b android10-release gcc-arm64
         
         # Download ARM32 GCC 4.9 (for compat vdso)
-        echo "Downloading ARM32 GCC 4.9..."
-        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 gcc-arm
+        echo "Downloading ARM32 GCC 4.9 (android10-release)..."
+        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 -b android10-release gcc-arm
 
     - name: Clone Realme GT Neo 2 Kernel Source
       run: |
@@ -61,25 +61,51 @@ jobs:
       run: |
         cd kernel_src
         
-        # 1. Fix Python 2 gcc-wrapper.py warning blocker (turn into pure pass-through runner)
+        # 1. Neutralize Qualcomm gcc-wrapper in Makefile and wrapper script
+        sed -i 's|CC\t\t= $(PYTHON) $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)|CC\t\t= $(REAL_CC)|g' Makefile
         printf '#! /usr/bin/env python3\nimport sys, subprocess\nsys.exit(subprocess.call(sys.argv[1:]))\n' > scripts/gcc-wrapper.py
         chmod +x scripts/gcc-wrapper.py
         
-        # 2. Fix missing proprietary Kconfig references and OEM awk parsing
-        rm -rf kernel/sched_assist kernel/tuning 2>/dev/null || true
-        mkdir -p kernel/sched_assist kernel/tuning
-        touch kernel/sched_assist/Kconfig kernel/tuning/Kconfig
-        sed -i 's/source "kernel\/sched_assist\/Kconfig"/# source "kernel\/sched_assist\/Kconfig"/g' init/Kconfig
-        sed -i 's/source "kernel\/tuning\/Kconfig"/# source "kernel\/tuning\/Kconfig"/g' init/Kconfig
-        sed -i '/#ifdef OPLUS_FEATURE_SCHED_ASSIST/d; /#endif \/\* OPLUS_FEATURE_SCHED_ASSIST \*\//d' init/Kconfig
-        sed -i '/#ifdef OPLUS_FEATURE_INPUT_BOOST_V4/d; /#endif \/\* OPLUS_FEATURE_INPUT_BOOST_V4 \*\//d' init/Kconfig
-        sed -i 's/awk -F '\''\/'\'' '\''{ print $$(NF-1) }'\''/awk -F '\''\/'\'' '\''NF>1 { print $$(NF-1) }'\''/g' OplusKernelEnvConfig.mk
+        # 2. Fix broken OplusKernelEnvConfig.mk awk standby block
+        sed -i '180,192d' OplusKernelEnvConfig.mk 2>/dev/null || true
         
-        # 3. Apply NoMount built-in driver
+        # 3. Clean up OEM dummy gitlinks
+        rm -rf kernel/sched_assist kernel/tuning 2>/dev/null || true
+        
+        # 4. Universal Kconfig scanner: comment out any missing source target in all Kconfigs
+        python3 -c '
+        import os, re
+        for root, dirs, files in os.walk("."):
+            for f in files:
+                if "Kconfig" in f:
+                    fp = os.path.join(root, f)
+                    try:
+                        with open(fp, "r", encoding="utf-8", errors="ignore") as file:
+                            lines = file.readlines()
+                        changed = False
+                        newlines = []
+                        for line in lines:
+                            m = re.match(r"^\s*source\s+[\"'\']?([^\"'\s]+)[\"'\']?", line)
+                            if m:
+                                target = m.group(1).strip("\"'\''")
+                                if not os.path.exists(target) and not os.path.exists(os.path.join(root, target)):
+                                    print(f"Disabling missing Kconfig: {target} in {fp}")
+                                    newlines.append(f"# {line.strip()} # disabled missing OEM Kconfig\n")
+                                    changed = True
+                                    continue
+                            newlines.append(line)
+                        if changed:
+                            with open(fp, "w", encoding="utf-8") as file:
+                                file.writelines(newlines)
+                    except Exception as e:
+                        pass
+        '
+        
+        # 5. Apply NoMount built-in driver
         echo "Applying NoMount integration..."
         curl -s https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh | bash -s -- dev
         
-        # 4. Check if SuSFS patch exists and apply
+        # 6. Check if SuSFS patch exists and apply
         if [ -f "../50_add_susfs_in_kernel-4.19.patch" ]; then
           echo "Applying SuSFS 4.19 patch..."
           patch -p1 < ../50_add_susfs_in_kernel-4.19.patch || true
@@ -89,7 +115,7 @@ jobs:
           [ -f "../include/linux/sus_su.h" ] && cp ../include/linux/sus_su.h include/linux/
         fi
         
-        # 5. Conceal NoMount symbols in kallsyms
+        # 7. Conceal NoMount symbols in kallsyms
         if grep -q "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS" kernel/kallsyms.c; then
           sed -i 's/!strncmp(iter->name, "ksud", 4)/!strncmp(iter->name, "ksud", 4) || !strncmp(iter->name, "nm_", 3) || !strncmp(iter->name, "nomount_", 8)/g' kernel/kallsyms.c
         fi
@@ -132,8 +158,8 @@ jobs:
         DEFCONFIG=vendor/kona-perf_defconfig
         [ ! -f "arch/arm64/configs/$DEFCONFIG" ] && DEFCONFIG=vendor/kona_defconfig
         
-        make O=out ARCH=arm64 $DEFCONFIG
-        make -j$(nproc --all) O=out ARCH=arm64 Image dtbs
+        make O=out ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-android- CROSS_COMPILE_ARM32=arm-linux-androideabi- $DEFCONFIG
+        make -j$(nproc --all) O=out ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-android- CROSS_COMPILE_ARM32=arm-linux-androideabi- Image dtbs
 
     - name: Patch Kernel with APatch kptools
       run: |
@@ -161,7 +187,7 @@ jobs:
         [ -f kernel_src/out/arch/arm64/boot/dtb ] && cp kernel_src/out/arch/arm64/boot/dtb anykernel/
         
         # Copy custom AnyKernel3 config
-        cp ../anykernel.sh anykernel/anykernel.sh
+        [ -f anykernel.sh ] && cp anykernel.sh anykernel/anykernel.sh
         
         cd anykernel
         zip -r9 ../AnyKernel3-NoMount-bitra.zip * -x README.md
