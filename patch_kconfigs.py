@@ -1,6 +1,6 @@
 import os, re, sys
 
-print("=== Running Bitra Kernel Source & Kconfig Patcher ===")
+print("=== Running Bitra Kernel Source, Kconfig & Makefile Patcher ===")
 
 # 1. Neutralize gcc-wrapper.py in Makefile
 if os.path.exists("Makefile"):
@@ -42,7 +42,7 @@ if os.path.exists("OplusKernelEnvConfig.mk"):
         f.writelines(new_lines)
     print("Cleaned OplusKernelEnvConfig.mk powerinfo block")
 
-# 4. Remove OEM gitlinks if they exist
+# 4. Remove OEM dummy gitlinks if they exist
 for dummy in ["kernel/sched_assist", "kernel/tuning"]:
     if os.path.exists(dummy):
         if os.path.isdir(dummy) and not os.path.islink(dummy):
@@ -56,7 +56,6 @@ for dummy in ["kernel/sched_assist", "kernel/tuning"]:
         print(f"Removed dummy gitlink: {dummy}")
 
 # 5. Universal Kconfig scanner
-# Refined regex: must match 'source' followed by quotes OR a path containing '/'
 pattern = re.compile(r"^(\s*)source\s+(\"([^\"]+)\"|'([^']+)'|([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-./]+))")
 
 disabled_count = 0
@@ -95,3 +94,41 @@ for root, dirs, files in os.walk("."):
                 pass
 
 print(f"Universal Kconfig scanner completed. Total missing OEM sources disabled: {disabled_count}")
+
+# 6. Universal Makefile scanner for missing OEM subdirectories
+mf_fixed_count = 0
+for root, dirs, files in os.walk("."):
+    for f in files:
+        if f in ["Makefile", "Kbuild"]:
+            mf_path = os.path.join(root, f)
+            try:
+                with open(mf_path, "r", encoding="utf-8", errors="ignore") as mfile:
+                    mlines = mfile.readlines()
+                mchanged = False
+                out_mlines = []
+                for mline in mlines:
+                    m = re.search(r"^\s*obj-[^+=]*\+=\s*([a-zA-Z0-9_\-]+)/", mline)
+                    if m:
+                        subdir = m.group(1)
+                        full_subdir = os.path.join(root, subdir)
+                        if not os.path.exists(full_subdir):
+                            if subdir == "osdcardfs" and os.path.exists(os.path.join(root, "sdcardfs")):
+                                out_mlines.append(mline.replace("osdcardfs/", "sdcardfs/"))
+                                print(f"Redirected osdcardfs/ -> sdcardfs/ in {mf_path}")
+                                mchanged = True
+                                mf_fixed_count += 1
+                                continue
+                            else:
+                                out_mlines.append(f"# {mline.strip()} # disabled missing OEM subdir\n")
+                                print(f"Disabled missing OEM subdir: {subdir}/ in {mf_path}")
+                                mchanged = True
+                                mf_fixed_count += 1
+                                continue
+                    out_mlines.append(mline)
+                if mchanged:
+                    with open(mf_path, "w", encoding="utf-8") as mfile:
+                        mfile.writelines(out_mlines)
+            except Exception as e:
+                pass
+
+print(f"Universal Makefile scanner completed. Total missing OEM subdirs fixed: {mf_fixed_count}")
