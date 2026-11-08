@@ -66,6 +66,7 @@ jobs:
         chmod +x scripts/gcc-wrapper.py
         
         # 2. Fix missing proprietary Kconfig references and OEM awk parsing
+        rm -rf kernel/sched_assist kernel/tuning 2>/dev/null || true
         mkdir -p kernel/sched_assist kernel/tuning
         touch kernel/sched_assist/Kconfig kernel/tuning/Kconfig
         sed -i 's/source "kernel\/sched_assist\/Kconfig"/# source "kernel\/sched_assist\/Kconfig"/g' init/Kconfig
