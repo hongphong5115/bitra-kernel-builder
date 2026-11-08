@@ -1,0 +1,148 @@
+name: Build Bitra Kernel with NoMount, SuSFS & APatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      superkey:
+        description: 'APatch SuperKey'
+        required: false
+        default: 'AntigravityRoot'
+      branch:
+        description: 'Kernel branch'
+        required: true
+        default: 'android-13'
+
+jobs:
+  build:
+    name: Build Kernel
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          bc bison build-essential ca-certificates ccache clang curl flex git \
+          gnupg libelf-dev libssl-dev lz4 make python3 unzip zip
+
+    - name: Download Toolchains
+      run: |
+        mkdir -p toolchains
+        cd toolchains
+        
+        # Download Android Clang 10.0.7 (r383902)
+        echo "Downloading Android Clang..."
+        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b android10-release clang_repo
+        tar -xzf clang_repo/clang-r383902.tar.gz -C . 2>/dev/null || mv clang_repo/clang-r383902 clang
+        
+        # Download AArch64 GCC 4.9
+        echo "Downloading AArch64 GCC..."
+        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 gcc-arm64
+        
+        # Download ARM32 GCC 4.9 (for compat vdso)
+        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 gcc-arm
+
+    - name: Clone Realme GT Neo 2 Kernel Source
+      run: |
+        git clone --depth=1 https://github.com/realme-kernel-opensource/realme_GTneo2-Q5pro-GTMasterExploratory-AndroidT-kernel-source -b ${{ github.event.inputs.branch }} kernel_src
+
+    - name: Apply NoMount & SuSFS Patches
+      run: |
+        cd kernel_src
+        
+        # 1. Apply NoMount built-in driver
+        echo "Applying NoMount integration..."
+        curl -s https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh | bash -s dev
+        
+        # 2. Check if SuSFS patch exists and apply
+        if [ -f "../50_add_susfs_in_kernel-4.19.patch" ]; then
+          echo "Applying SuSFS 4.19 patch..."
+          patch -p1 < ../50_add_susfs_in_kernel-4.19.patch || true
+          [ -f "../fs/susfs.c" ] && cp ../fs/susfs.c fs/
+          [ -f "../include/linux/susfs.h" ] && cp ../include/linux/susfs.h include/linux/
+          [ -f "../include/linux/susfs_def.h" ] && cp ../include/linux/susfs_def.h include/linux/
+        fi
+        
+        # 3. Conceal NoMount symbols in kallsyms
+        if grep -q "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS" kernel/kallsyms.c; then
+          sed -i 's/!strncmp(iter->name, "ksud", 4)/!strncmp(iter->name, "ksud", 4) || !strncmp(iter->name, "nm_", 3) || !strncmp(iter->name, "nomount_", 8)/g' kernel/kallsyms.c
+        fi
+
+    - name: Configure Kernel Defconfig
+      run: |
+        cd kernel_src
+        DEFCONFIG=vendor/kona-perf_defconfig
+        [ ! -f "arch/arm64/configs/$DEFCONFIG" ] && DEFCONFIG=vendor/kona_defconfig
+        
+        # Enable NoMount and Required Features
+        echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KEYS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KEYS_COMPAT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/$DEFCONFIG
+        
+        # Enable SuSFS
+        echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> arch/arm64/configs/$DEFCONFIG
+
+    - name: Compile Kernel
+      run: |
+        cd kernel_src
+        export PATH="$(pwd)/../toolchains/clang/bin:$(pwd)/../toolchains/gcc-arm64/bin:$(pwd)/../toolchains/gcc-arm/bin:$PATH"
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export CC=clang
+        export CLANG_TRIPLE=aarch64-linux-gnu-
+        export CROSS_COMPILE=aarch64-linux-android-
+        export CROSS_COMPILE_ARM32=arm-linux-androideabi-
+        
+        DEFCONFIG=vendor/kona-perf_defconfig
+        [ ! -f "arch/arm64/configs/$DEFCONFIG" ] && DEFCONFIG=vendor/kona_defconfig
+        
+        make O=out ARCH=arm64 $DEFCONFIG
+        make -j$(nproc --all) O=out ARCH=arm64 Image dtbs
+
+    - name: Patch Kernel with APatch kptools
+      run: |
+        # Download latest kptools and kpimg
+        curl -sLO https://raw.githubusercontent.com/bmax121/APatch/main/assets/kpimg
+        curl -sLO https://raw.githubusercontent.com/bmax121/APatch/main/tools/linux/x86_64/kptools
+        chmod +x kptools
+        
+        IMAGE=kernel_src/out/arch/arm64/boot/Image
+        ./kptools -p -i "$IMAGE" -k kpimg -s "${{ github.event.inputs.superkey }}" -o Image.patched
+        mv Image.patched "$IMAGE"
+
+    - name: Package AnyKernel3
+      run: |
+        git clone --depth=1 https://github.com/osm0sis/AnyKernel3 -b master anykernel
+        rm -rf anykernel/.git
+        
+        # Copy compiled Image and DTB
+        cp kernel_src/out/arch/arm64/boot/Image anykernel/
+        [ -f kernel_src/out/arch/arm64/boot/dtb ] && cp kernel_src/out/arch/arm64/boot/dtb anykernel/
+        
+        # Configure AnyKernel3 banner for bitra
+        sed -i 's/device.name1=.*/device.name1=bitra/g' anykernel/anykernel.sh
+        sed -i 's/device.name2=.*/device.name2=RMX3370/g' anykernel/anykernel.sh
+        sed -i 's/block=.*/block=\/dev\/block\/bootdevice\/by-name\/boot/g' anykernel/anykernel.sh
+        sed -i 's/is_slot_device=1/is_slot_device=0/g' anykernel/anykernel.sh
+        
+        cd anykernel
+        zip -r9 ../AnyKernel3-NoMount-bitra.zip * -x README.md
+
+    - name: Upload Kernel Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AnyKernel3-NoMount-bitra
+        path: AnyKernel3-NoMount-bitra.zip
