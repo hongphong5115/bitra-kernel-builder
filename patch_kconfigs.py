@@ -606,9 +606,18 @@ if os.path.exists("drivers/staging/android/ion/ion_system_heap.c"):
     with open("drivers/staging/android/ion/ion_system_heap.c", "r", encoding="utf-8", errors="ignore") as f:
         ic = f.read()
     ic = re.sub(r'#ifdef\s+CONFIG_OPLUS_ION_BOOSTPOOL', '#if 0 /* DISABLED CONFIG_OPLUS_ION_BOOSTPOOL */', ic)
+    # Define fallback for NR_IONCACHE_PAGES (when OPLUS_FEATURE_HEALTHINFO is disabled)
+    if "NR_IONCACHE_PAGES" in ic and "#define NR_IONCACHE_PAGES" not in ic:
+        ic = "#ifndef NR_IONCACHE_PAGES\n#define NR_IONCACHE_PAGES NR_FREE_PAGES\n#endif\n" + ic
+    # Stub fill_pool_kworkthread to return 0 immediately instead of while-looping
+    ic = re.sub(
+        r"static int fill_pool_kworkthread\(void \*p\)[\s\S]*?\n\}",
+        "static int fill_pool_kworkthread(void *p)\n{\n\tpr_info(\"boot time ION pool filling finished\\n\");\n\treturn 0;\n}",
+        ic
+    )
     with open("drivers/staging/android/ion/ion_system_heap.c", "w", encoding="utf-8") as f:
         f.write(ic)
-    print("Disabled CONFIG_OPLUS_ION_BOOSTPOOL in drivers/staging/android/ion/ion_system_heap.c")
+    print("Fixed drivers/staging/android/ion/ion_system_heap.c")
 
 # 24. Create stub directory and headers for include/soc/oplus/system
 sys_dir = "include/soc/oplus/system"
@@ -710,6 +719,21 @@ if os.path.exists("drivers/soc/qcom/subsys-pil-tz.c"):
     with open("drivers/soc/qcom/subsys-pil-tz.c", "w", encoding="utf-8") as f:
         f.write(pzc)
     print("Neutralized kernel_fb calls in drivers/soc/qcom/subsys-pil-tz.c")
+
+# 25. Fix drivers/soc/qcom/subsystem_restart.c missing OPLUS_BUG_STABILITY symbols
+if os.path.exists("drivers/soc/qcom/subsystem_restart.c"):
+    with open("drivers/soc/qcom/subsystem_restart.c", "r", encoding="utf-8", errors="ignore") as f:
+        src = f.read()
+    defs = """#define OPLUS_BUG_STABILITY 1
+#include <soc/oplus/system/oplus_project.h>
+extern bool oem_is_fulldump(void);
+"""
+    if "#define OPLUS_BUG_STABILITY" not in src:
+        src = defs + src
+    with open("drivers/soc/qcom/subsystem_restart.c", "w", encoding="utf-8") as f:
+        f.write(src)
+    print("Injected OPLUS_BUG_STABILITY into drivers/soc/qcom/subsystem_restart.c")
+
 
 
 
