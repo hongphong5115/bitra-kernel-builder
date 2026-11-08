@@ -989,6 +989,27 @@ if os.path.exists("block/Makefile"):
         f.write(bmf)
     print("Neutralized uxio_first in block/Makefile")
 
+# 41. Fix current_is_fg in drivers/block/zram/hybridswap/hybridswap_eswap.c
+hs_path = "drivers/block/zram/hybridswap/hybridswap_eswap.c"
+if os.path.exists(hs_path):
+    with open(hs_path, "r", encoding="utf-8", errors="ignore") as f:
+        hec = f.read()
+    if "current_is_fg" in hec and "static inline int current_is_fg" not in hec:
+        hec = "#define current_is_fg() (0)\n" + hec
+        with open(hs_path, "w", encoding="utf-8") as f:
+            f.write(hec)
+        print("Injected current_is_fg fallback in hybridswap_eswap.c")
+
+# 42. Fix unused variable ret2 in techpack/audio/asoc/codecs/ak4376/ak4376.c
+ak_path = "techpack/audio/asoc/codecs/ak4376/ak4376.c"
+if os.path.exists(ak_path):
+    with open(ak_path, "r", encoding="utf-8", errors="ignore") as f:
+        akc = f.read()
+    akc = akc.replace("int ret = 0, ret2 = 0;", "int ret = 0, ret2 = 0;\n\t(void)ret2;")
+    with open(ak_path, "w", encoding="utf-8") as f:
+        f.write(akc)
+    print("Fixed unused variable ret2 in ak4376.c")
+
 
 
 
