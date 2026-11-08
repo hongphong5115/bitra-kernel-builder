@@ -918,6 +918,7 @@ if os.path.exists("fs/proc/Makefile"):
     with open("fs/proc/Makefile", "r", encoding="utf-8", errors="ignore") as f:
         pmf = f.read()
     pmf = re.sub(r'obj-y\s*\+=\s*healthinfo\/', '# obj-y += healthinfo/', pmf)
+    pmf = re.sub(r'obj-y\s*\+=\s*task_cpustats\/', '# obj-y += task_cpustats/', pmf)
     with open("fs/proc/Makefile", "w", encoding="utf-8") as f:
         f.write(pmf)
     print("Neutralized healthinfo in fs/proc/Makefile")
