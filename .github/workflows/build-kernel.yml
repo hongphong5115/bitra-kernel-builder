@@ -11,6 +11,9 @@ on:
         description: 'Kernel branch'
         required: true
         default: 'master'
+  push:
+    branches:
+      - master
 
 jobs:
   build:
@@ -50,8 +53,9 @@ jobs:
 
     - name: Clone Realme GT Neo 2 Kernel Source
       run: |
-        echo "Cloning Realme GT Neo 2 Kernel source (branch: ${{ github.event.inputs.branch }})..."
-        git clone --depth=1 https://github.com/realme-kernel-opensource/realme_GTneo2-Q5pro-GTMasterExploratory-AndroidT-kernel-source -b ${{ github.event.inputs.branch }} kernel_src
+        BRANCH="${{ github.event.inputs.branch || 'master' }}"
+        echo "Cloning Realme GT Neo 2 Kernel source (branch: $BRANCH)..."
+        git clone --depth=1 https://github.com/realme-kernel-opensource/realme_GTneo2-Q5pro-GTMasterExploratory-AndroidT-kernel-source -b "$BRANCH" kernel_src
 
     - name: Apply NoMount & SuSFS Patches
       run: |
@@ -139,12 +143,13 @@ EOF
         IMAGE=kernel_src/out/arch/arm64/boot/Image
         cp "$IMAGE" Image.unpatched
         
-        if [ -n "${{ github.event.inputs.superkey }}" ]; then
-          echo "Patching Image with APatch kptools (SuperKey: ${{ github.event.inputs.superkey }})..."
+        SUPERKEY="${{ github.event.inputs.superkey || 'AntigravityRoot' }}"
+        if [ -n "$SUPERKEY" ]; then
+          echo "Patching Image with APatch kptools (SuperKey: $SUPERKEY)..."
           curl -sLO https://github.com/bmax121/KernelPatch/releases/download/0.13.9/kpimg-android
           curl -sLO https://github.com/bmax121/KernelPatch/releases/download/0.13.9/kptools-linux
           chmod +x kptools-linux
-          ./kptools-linux -p -i "$IMAGE" -k kpimg-android -s "${{ github.event.inputs.superkey }}" -o Image.patched
+          ./kptools-linux -p -i "$IMAGE" -k kpimg-android -s "$SUPERKEY" -o Image.patched
           mv Image.patched "$IMAGE"
           echo "Kernel successfully pre-patched with APatch!"
         fi
