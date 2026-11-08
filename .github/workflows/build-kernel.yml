@@ -148,6 +148,7 @@ jobs:
         if [ -n "$SUPERKEY" ]; then
           echo "Patching Image with APatch kptools (SuperKey: $SUPERKEY)..."
           git clone --depth=1 https://github.com/bmax121/KernelPatch -b 0.13.9 kp_src
+          cp -f kp_src/kernel/include/preset.h kp_src/tools/
           make -C kp_src/tools -j$(nproc)
           curl -sLO https://github.com/bmax121/KernelPatch/releases/download/0.13.9/kpimg-android
           ./kp_src/tools/kptools -p -i "$IMAGE" -k kpimg-android -s "$SUPERKEY" -o Image.patched
