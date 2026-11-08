@@ -560,9 +560,10 @@ for defcfg in ["arch/arm64/configs/vendor/kona-perf_defconfig", "arch/arm64/conf
         dc = re.sub(r"CONFIG_UFSHPB=y", "CONFIG_UFSHPB=n", dc)
         dc = re.sub(r"CONFIG_UFSTW=y", "CONFIG_UFSTW=n", dc)
         dc = re.sub(r"CONFIG_UFSHID=y", "CONFIG_UFSHID=n", dc)
+        dc = re.sub(r"CONFIG_OPLUS_ION_BOOSTPOOL=y", "CONFIG_OPLUS_ION_BOOSTPOOL=n", dc)
         with open(defcfg, "w", encoding="utf-8") as f:
             f.write(dc)
-        print(f"Disabled CONFIG_UFSFEATURE in {defcfg}")
+        print(f"Disabled CONFIG_UFSFEATURE & CONFIG_OPLUS_ION_BOOSTPOOL in {defcfg}")
 
 if os.path.exists("drivers/scsi/ufs/Makefile"):
     with open("drivers/scsi/ufs/Makefile", "r", encoding="utf-8", errors="ignore") as f:
@@ -586,6 +587,115 @@ if os.path.exists("drivers/scsi/ufs/ufshcd.h"):
     with open("drivers/scsi/ufs/ufshcd.h", "w", encoding="utf-8") as f:
         f.write(uhc)
     print("Neutralized UFSFEATURE declarations in drivers/scsi/ufs/ufshcd.h")
+
+# 23. Fix drivers/staging/android/ion missing oplus_ion_boost_pool.h
+ion_dir = "drivers/staging/android/ion"
+if os.path.exists(ion_dir):
+    stub_ion = """#ifndef _OPLUS_ION_BOOST_POOL_H_
+#define _OPLUS_ION_BOOST_POOL_H_
+#include <linux/types.h>
+struct ion_boost_pool { int dummy; };
+static inline struct ion_boost_pool *has_boost_pool(void *s, void *b) { return NULL; }
+#endif
+"""
+    with open(os.path.join(ion_dir, "oplus_ion_boost_pool.h"), "w", encoding="utf-8") as f:
+        f.write(stub_ion)
+    print("Created stub drivers/staging/android/ion/oplus_ion_boost_pool.h")
+
+if os.path.exists("drivers/staging/android/ion/ion_system_heap.c"):
+    with open("drivers/staging/android/ion/ion_system_heap.c", "r", encoding="utf-8", errors="ignore") as f:
+        ic = f.read()
+    ic = re.sub(r'#ifdef\s+CONFIG_OPLUS_ION_BOOSTPOOL', '#if 0 /* DISABLED CONFIG_OPLUS_ION_BOOSTPOOL */', ic)
+    with open("drivers/staging/android/ion/ion_system_heap.c", "w", encoding="utf-8") as f:
+        f.write(ic)
+    print("Disabled CONFIG_OPLUS_ION_BOOSTPOOL in drivers/staging/android/ion/ion_system_heap.c")
+
+# 24. Create stub directory and headers for include/soc/oplus/system
+sys_dir = "include/soc/oplus/system"
+os.makedirs(sys_dir, exist_ok=True)
+
+# 24.1 kernel_fb.h
+with open(os.path.join(sys_dir, "kernel_fb.h"), "w", encoding="utf-8") as f:
+    f.write("""#ifndef _KERNEL_FB_H_
+#define _KERNEL_FB_H_
+#define FB_SENSOR 0
+#define FB_SENSOR_ID_CRASH 0
+static inline void set_subsys_crash_cause(const char *reason) {}
+static inline int oplus_kevent_fb_str(int fb_type, int id, const char *reason) { return 0; }
+#endif
+""")
+
+# 24.2 oplus_mm_kevent_fb.h
+with open(os.path.join(sys_dir, "oplus_mm_kevent_fb.h"), "w", encoding="utf-8") as f:
+    f.write("""#ifndef _OPLUS_MM_KEVENT_FB_H_
+#define _OPLUS_MM_KEVENT_FB_H_
+#define OPLUS_AUDIO_EVENTID_ADSP_CRASH 0
+#define MM_FB_KEY_RATELIMIT_5MIN 0
+#define OPLUS_MM_DIRVER_FB_EVENT_DISPLAY 0
+static inline int mm_fb_audio_kevent_named(int event_id, int rate, const char *fmt, ...) { return 0; }
+static inline int mm_fb_kevent(int event_id, const char *fmt, ...) { return 0; }
+#endif
+""")
+
+# 24.3 boot_mode.h, oppo_project.h, oplus_project.h
+with open(os.path.join(sys_dir, "boot_mode.h"), "w", encoding="utf-8") as f:
+    f.write("""#ifndef _SOC_OPLUS_BOOT_MODE_H_
+#define _SOC_OPLUS_BOOT_MODE_H_
+#if __has_include(<soc/oppo/boot_mode.h>)
+#include <soc/oppo/boot_mode.h>
+#endif
+#endif
+""")
+
+with open(os.path.join(sys_dir, "oppo_project.h"), "w", encoding="utf-8") as f:
+    f.write("""#ifndef _SOC_OPLUS_OPPO_PROJECT_H_
+#define _SOC_OPLUS_OPPO_PROJECT_H_
+#if __has_include(<soc/oppo/oppo_project.h>)
+#include <soc/oppo/oppo_project.h>
+#endif
+#endif
+""")
+
+with open(os.path.join(sys_dir, "oplus_project.h"), "w", encoding="utf-8") as f:
+    f.write("""#ifndef _SOC_OPLUS_OPLUS_PROJECT_H_
+#define _SOC_OPLUS_OPLUS_PROJECT_H_
+#if __has_include(<soc/oppo/oppo_project.h>)
+#include <soc/oppo/oppo_project.h>
+#endif
+#endif
+""")
+
+# 24.4 other stub headers
+other_stubs = [
+    ("hung_task_enhance.h", ""),
+    ("oplus_brightscreen_check.h", ""),
+    ("oplus_bscheck.h", ""),
+    ("oplus_misc.h", ""),
+    ("oplus_signal.h", ""),
+    ("oplus_sync_time.h", ""),
+    ("oppo_process.h", "static inline int is_critial_process(const char *comm) { return 0; }"),
+    ("proc.h", ""),
+    ("qcom_minidump_enhance.h", ""),
+    ("uboot_utils.h", ""),
+]
+
+for hname, body in other_stubs:
+    guard = "_" + hname.upper().replace(".", "_") + "_"
+    with open(os.path.join(sys_dir, hname), "w", encoding="utf-8") as f:
+        f.write(f"#ifndef {guard}\n#define {guard}\n{body}\n#endif\n")
+
+print("Created all OEM stubs in include/soc/oplus/system/")
+
+# Also neutralize kernel_fb in subsys-pil-tz.c
+if os.path.exists("drivers/soc/qcom/subsys-pil-tz.c"):
+    with open("drivers/soc/qcom/subsys-pil-tz.c", "r", encoding="utf-8", errors="ignore") as f:
+        pzc = f.read()
+    pzc = re.sub(r'#include\s*<soc/oplus/system/kernel_fb\.h>', '// #include <soc/oplus/system/kernel_fb.h>', pzc)
+    pzc = re.sub(r'oplus_kevent_fb_str\([^;]*\);', '// oplus_kevent_fb_str;', pzc)
+    with open("drivers/soc/qcom/subsys-pil-tz.c", "w", encoding="utf-8") as f:
+        f.write(pzc)
+    print("Neutralized kernel_fb calls in drivers/soc/qcom/subsys-pil-tz.c")
+
 
 
 
