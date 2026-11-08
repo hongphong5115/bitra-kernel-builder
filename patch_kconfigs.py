@@ -526,5 +526,25 @@ if os.path.exists("drivers/nfc/Makefile"):
             f.write(nmk)
         print("Added -DOPLUS_BUG_STABILITY to drivers/nfc/Makefile")
 
+# 20. Fix drivers/power/reset/msm-poweroff.c undeclared PON_RESTART_REASON_NORMAL
+if os.path.exists("include/linux/input/qpnp-power-on.h"):
+    with open("include/linux/input/qpnp-power-on.h", "r", encoding="utf-8", errors="ignore") as f:
+        qpc = f.read()
+    qpc = qpc.replace("#ifdef OPLUS_BUG_STABILITY\n/* Add for oplus boot mode*/", "/* Add for oplus boot mode*/")
+    qpc = re.sub(r"(PON_RESTART_REASON_NORMAL\s*=\s*0x3E,)\s*\n#endif", r"\1", qpc)
+    with open("include/linux/input/qpnp-power-on.h", "w", encoding="utf-8") as f:
+        f.write(qpc)
+    print("Fixed include/linux/input/qpnp-power-on.h PON_RESTART_REASON_NORMAL")
+
+if os.path.exists("drivers/power/reset/msm-poweroff.c"):
+    with open("drivers/power/reset/msm-poweroff.c", "r", encoding="utf-8", errors="ignore") as f:
+        mpc = f.read()
+    if "PON_RESTART_REASON_NORMAL" not in mpc[:1000]:
+        mpc = "#ifndef PON_RESTART_REASON_NORMAL\n#define PON_RESTART_REASON_NORMAL 0x3E\n#endif\n" + mpc
+        with open("drivers/power/reset/msm-poweroff.c", "w", encoding="utf-8") as f:
+            f.write(mpc)
+        print("Defined PON_RESTART_REASON_NORMAL in drivers/power/reset/msm-poweroff.c")
+
+
 
 
