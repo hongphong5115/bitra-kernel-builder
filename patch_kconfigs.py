@@ -1183,6 +1183,45 @@ if os.path.exists(act_path):
         f.write(actc)
     print("Stubbed oplus_cam_actuator_power_up in oplus_cam_actuator_core.c")
 
+# 50. Fix oplus_cam_flash_dev.c
+flash_dev_path = "techpack/camera/drivers/cam_sensor_module/oplus/cam_flash/oplus_cam_flash_dev.c"
+if os.path.exists(flash_dev_path):
+    with open(flash_dev_path, "r", encoding="utf-8", errors="ignore") as f:
+        fc = f.read()
+    fc = fc.replace(
+        "void oplus_cam_flash_proc_init(struct cam_flash_ctrl *flash_ctl,\n    struct platform_device *pdev)\n{\n    if (flash_proc_init(flash_ctl) < 0) {\n        device_create_file(&pdev->dev, &dev_attr_fswitch);\n    }\n}",
+        "void oplus_cam_flash_proc_init(struct cam_flash_ctrl *flash_ctl,\n    struct platform_device *pdev)\n{\n#ifdef OPLUS_FEATURE_CAMERA_COMMON\n    if (flash_proc_init(flash_ctl) < 0) {\n        device_create_file(&pdev->dev, &dev_attr_fswitch);\n    }\n#endif\n}"
+    )
+    with open(flash_dev_path, "w", encoding="utf-8") as f:
+        f.write(fc)
+    print("Fixed oplus_cam_flash_proc_init in oplus_cam_flash_dev.c")
+
+# 51. Fix get_main_display in dsi_display.h and dsi_phy_hw_v4_0.c
+dsi_h_path = "techpack/display/msm/dsi/dsi_display.h"
+if os.path.exists(dsi_h_path):
+    with open(dsi_h_path, "r", encoding="utf-8", errors="ignore") as f:
+        dhc = f.read()
+    dhc = dhc.replace(
+        "#ifdef OPLUS_BUG_STABILITY\nstruct dsi_display *get_main_display(void);",
+        "struct dsi_display *get_main_display(void);\n#ifdef OPLUS_BUG_STABILITY"
+    )
+    with open(dsi_h_path, "w", encoding="utf-8") as f:
+        f.write(dhc)
+    print("Declared get_main_display unconditionally in dsi_display.h")
+
+dsi_phy_path = "techpack/display/msm/dsi/dsi_phy_hw_v4_0.c"
+if os.path.exists(dsi_phy_path):
+    with open(dsi_phy_path, "r", encoding="utf-8", errors="ignore") as f:
+        dpc = f.read()
+    dpc = dpc.replace(
+        "struct dsi_display *display = get_main_display();",
+        "#ifdef OPLUS_BUG_STABILITY\n\tstruct dsi_display *display = get_main_display();\n#else\n\tstruct dsi_display *display = NULL;\n\t(void)display;\n#endif"
+    )
+    with open(dsi_phy_path, "w", encoding="utf-8") as f:
+        f.write(dpc)
+    print("Guarded get_main_display in dsi_phy_hw_v4_0.c")
+
+
 
 
 
