@@ -467,3 +467,39 @@ for defcfg in ["arch/arm64/configs/vendor/kona-perf_defconfig", "arch/arm64/conf
             f.write(dc)
         print(f"Disabled CONFIG_STMVL53L1 in {defcfg}")
 
+# 18. Fix MMC host/card missing detect_change_retry and speed_class
+# In Realme kernel, CONFIG_EMMC_SDCARD_OPTIMIZE expects detect_change_retry and speed_class in mmc_host / sd_ssr
+if os.path.exists("include/linux/mmc/host.h"):
+    with open("include/linux/mmc/host.h", "r", encoding="utf-8", errors="ignore") as f:
+        hc = f.read()
+    hc = re.sub(
+        r"#ifdef\s+OPLUS_FEATURE_EMMC_SDCARD_OPTIMIZE\s*\n\s*int\s+detect_change_retry;\s*\n\s*#endif",
+        "int detect_change_retry; /* Unconditional for CONFIG_EMMC_SDCARD_OPTIMIZE */",
+        hc
+    )
+    with open("include/linux/mmc/host.h", "w", encoding="utf-8") as f:
+        f.write(hc)
+    print("Fixed include/linux/mmc/host.h detect_change_retry")
+
+if os.path.exists("include/linux/mmc/card.h"):
+    with open("include/linux/mmc/card.h", "r", encoding="utf-8", errors="ignore") as f:
+        cc = f.read()
+    cc = re.sub(
+        r"#ifdef\s+OPLUS_FEATURE_EMMC_SDCARD_OPTIMIZE\s*\n\s*unsigned\s+int\s+speed_class;[^\n]*\n\s*#endif[^\n]*",
+        "\tunsigned int\t\tspeed_class; /* Unconditional for CONFIG_EMMC_SDCARD_OPTIMIZE */",
+        cc
+    )
+    with open("include/linux/mmc/card.h", "w", encoding="utf-8") as f:
+        f.write(cc)
+    print("Fixed include/linux/mmc/card.h speed_class")
+
+if os.path.exists("drivers/mmc/core/Makefile"):
+    with open("drivers/mmc/core/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        mcc = f.read()
+    if "OPLUS_FEATURE_EMMC_SDCARD_OPTIMIZE" not in mcc:
+        mcc = "ccflags-y += -DOPLUS_FEATURE_EMMC_SDCARD_OPTIMIZE\n" + mcc
+        with open("drivers/mmc/core/Makefile", "w", encoding="utf-8") as f:
+            f.write(mcc)
+        print("Added -DOPLUS_FEATURE_EMMC_SDCARD_OPTIMIZE to drivers/mmc/core/Makefile")
+
+
