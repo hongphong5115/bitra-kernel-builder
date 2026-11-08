@@ -900,10 +900,14 @@ if os.path.exists("include/linux/msm_drm_notify.h"):
 if os.path.exists("mm/vmscan.c"):
     with open("mm/vmscan.c", "r", encoding="utf-8", errors="ignore") as f:
         vmc = f.read()
-    vmc = vmc.replace("//int kswapd_threads = DEF_KSWAPD_THREADS_PER_NODE;", "int kswapd_threads = 1;")
+    vmc = re.sub(
+        r"#ifndef CONFIG_OPLUS_MULTI_KSWAPD[\s\S]*?#endif\s*\/\*CONFIG_OPLUS_MULTI_KSWAPD\*\/",
+        "#define DEF_KSWAPD_THREADS_PER_NODE 1\nint kswapd_threads = 1;\nint kswapd_threads_current = 1;",
+        vmc
+    )
     with open("mm/vmscan.c", "w", encoding="utf-8") as f:
         f.write(vmc)
-    print("Fixed mm/vmscan.c kswapd_threads declaration")
+    print("Fixed mm/vmscan.c kswapd_threads and kswapd_threads_current declaration")
 
 if os.path.exists("drivers/soc/qcom/watchdog_v2.c"):
     with open("drivers/soc/qcom/watchdog_v2.c", "r", encoding="utf-8", errors="ignore") as f:
