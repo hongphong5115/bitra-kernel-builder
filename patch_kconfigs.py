@@ -1272,6 +1272,48 @@ if os.path.exists(dsi_c_path):
         f.write(dsic)
     print("Guarded dsi_display_register_read in dsi_display.c")
 
+# 54. Fix oplus_cam_ois_core.c
+ois_core_path = "techpack/camera/drivers/cam_sensor_module/oplus/cam_ois/oplus_cam_ois_core.c"
+if os.path.exists(ois_core_path):
+    with open(ois_core_path, "r", encoding="utf-8", errors="ignore") as f:
+        oc = f.read()
+    oc = re.sub(
+        r'int32_t cam_lc898128_write_data\(struct cam_ois_ctrl_t \* o_ctrl,void \* arg\)[\s\S]*?^}',
+        'int32_t cam_lc898128_write_data(struct cam_ois_ctrl_t * o_ctrl,void * arg) { return 0; }',
+        oc,
+        flags=re.MULTILINE
+    )
+    oc = oc.replace("case CAM_GET_OIS_EIS_HALL:", "#if 0\ncase CAM_GET_OIS_EIS_HALL:")
+    oc = oc.replace(
+        "case CAM_WRITE_CALIBRATION_DATA:\ncase CAM_WRITE_AE_SYNC_DATA:\n    CAM_DBG(CAM_OIS, \"CAM_WRITE_DATA\");\n    if (strstr(o_ctrl->ois_name, \"lc898\") != NULL) {\n        rc = cam_lc898128_write_data(o_ctrl, arg);\n        if (rc) {\n            CAM_ERR(CAM_EEPROM, \"Failed in write AE sync data\");\n\t     return rc;\n        }\n    }\n    break;",
+        "case CAM_WRITE_CALIBRATION_DATA:\ncase CAM_WRITE_AE_SYNC_DATA:\n    break;\n#endif"
+    )
+    with open(ois_core_path, "w", encoding="utf-8") as f:
+        f.write(oc)
+    print("Stubbed lc898128 and guarded OIS opcodes in oplus_cam_ois_core.c")
+
+# 55. Fix aw8697 haptic
+aw_mk_path = "drivers/misc/aw8697_haptic/Makefile"
+if os.path.exists(aw_mk_path):
+    with open(aw_mk_path, "r", encoding="utf-8", errors="ignore") as f:
+        awmc = f.read()
+    if "ccflags-y += -DOPLUS_FEATURE_CHG_BASIC" not in awmc:
+        awmc = "ccflags-y += -DOPLUS_FEATURE_CHG_BASIC\n" + awmc
+        with open(aw_mk_path, "w", encoding="utf-8") as f:
+            f.write(awmc)
+    print("Injected ccflags-y += -DOPLUS_FEATURE_CHG_BASIC into aw8697_haptic/Makefile")
+
+aw_h_path = "drivers/misc/aw8697_haptic/aw8697.h"
+if os.path.exists(aw_h_path):
+    with open(aw_h_path, "r", encoding="utf-8", errors="ignore") as f:
+        awhc = f.read()
+    if "#define OPLUS_FEATURE_CHG_BASIC" not in awhc:
+        awhc = "#ifndef OPLUS_FEATURE_CHG_BASIC\n#define OPLUS_FEATURE_CHG_BASIC 1\n#endif\n" + awhc
+        with open(aw_h_path, "w", encoding="utf-8") as f:
+            f.write(awhc)
+    print("Injected OPLUS_FEATURE_CHG_BASIC into aw8697.h")
+
+
 
 
 
