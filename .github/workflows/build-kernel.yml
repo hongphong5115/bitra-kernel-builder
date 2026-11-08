@@ -61,51 +61,14 @@ jobs:
       run: |
         cd kernel_src
         
-        # 1. Neutralize Qualcomm gcc-wrapper in Makefile and wrapper script
-        sed -i 's|CC\t\t= $(PYTHON) $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)|CC\t\t= $(REAL_CC)|g' Makefile
-        printf '#! /usr/bin/env python3\nimport sys, subprocess\nsys.exit(subprocess.call(sys.argv[1:]))\n' > scripts/gcc-wrapper.py
-        chmod +x scripts/gcc-wrapper.py
+        # 1. Apply OEM fixes and universal Kconfig cleanup via python helper
+        python3 ../patch_kconfigs.py
         
-        # 2. Fix broken OplusKernelEnvConfig.mk awk standby block
-        sed -i '180,192d' OplusKernelEnvConfig.mk 2>/dev/null || true
-        
-        # 3. Clean up OEM dummy gitlinks
-        rm -rf kernel/sched_assist kernel/tuning 2>/dev/null || true
-        
-        # 4. Universal Kconfig scanner: comment out any missing source target in all Kconfigs
-        python3 -c '
-        import os, re
-        for root, dirs, files in os.walk("."):
-            for f in files:
-                if "Kconfig" in f:
-                    fp = os.path.join(root, f)
-                    try:
-                        with open(fp, "r", encoding="utf-8", errors="ignore") as file:
-                            lines = file.readlines()
-                        changed = False
-                        newlines = []
-                        for line in lines:
-                            m = re.match(r"^\s*source\s+[\"'\']?([^\"'\s]+)[\"'\']?", line)
-                            if m:
-                                target = m.group(1).strip("\"'\''")
-                                if not os.path.exists(target) and not os.path.exists(os.path.join(root, target)):
-                                    print(f"Disabling missing Kconfig: {target} in {fp}")
-                                    newlines.append(f"# {line.strip()} # disabled missing OEM Kconfig\n")
-                                    changed = True
-                                    continue
-                            newlines.append(line)
-                        if changed:
-                            with open(fp, "w", encoding="utf-8") as file:
-                                file.writelines(newlines)
-                    except Exception as e:
-                        pass
-        '
-        
-        # 5. Apply NoMount built-in driver
+        # 2. Apply NoMount built-in driver
         echo "Applying NoMount integration..."
         curl -s https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh | bash -s -- dev
         
-        # 6. Check if SuSFS patch exists and apply
+        # 3. Check if SuSFS patch exists and apply
         if [ -f "../50_add_susfs_in_kernel-4.19.patch" ]; then
           echo "Applying SuSFS 4.19 patch..."
           patch -p1 < ../50_add_susfs_in_kernel-4.19.patch || true
@@ -115,7 +78,7 @@ jobs:
           [ -f "../include/linux/sus_su.h" ] && cp ../include/linux/sus_su.h include/linux/
         fi
         
-        # 7. Conceal NoMount symbols in kallsyms
+        # 4. Conceal NoMount symbols in kallsyms
         if grep -q "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS" kernel/kallsyms.c; then
           sed -i 's/!strncmp(iter->name, "ksud", 4)/!strncmp(iter->name, "ksud", 4) || !strncmp(iter->name, "nm_", 3) || !strncmp(iter->name, "nomount_", 8)/g' kernel/kallsyms.c
         fi
