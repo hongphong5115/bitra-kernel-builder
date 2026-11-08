@@ -121,11 +121,12 @@ for root, dirs, files in os.walk("."):
                 whole_file = "".join(mlines)
                 for mline in mlines:
                     # 6.1 Check subdirectories
-                    m = re.search(r"^\s*obj-[^+=]*\+=\s*([a-zA-Z0-9_\-]+)/", mline)
+                    m = re.search(r"^\s*obj-[^+=]*\+=\s*([a-zA-Z0-9_\-/]+)/", mline)
                     if m:
                         subdir = m.group(1)
                         full_subdir = os.path.join(root, subdir)
-                        if not os.path.exists(full_subdir):
+                        has_mk = os.path.exists(os.path.join(full_subdir, "Makefile")) or os.path.exists(os.path.join(full_subdir, "Kbuild"))
+                        if not os.path.exists(full_subdir) or not has_mk:
                             if subdir == "osdcardfs" and os.path.exists(os.path.join(root, "sdcardfs")):
                                 out_mlines.append(mline.replace("osdcardfs/", "sdcardfs/"))
                                 print(f"Redirected osdcardfs/ -> sdcardfs/ in {mf_path}")
@@ -133,7 +134,7 @@ for root, dirs, files in os.walk("."):
                                 mf_fixed_count += 1
                                 continue
                             else:
-                                out_mlines.append(f"# {mline.strip()} # disabled missing OEM subdir\n")
+                                out_mlines.append(f"# {mline.strip()} # disabled missing OEM subdir or Makefile\n")
                                 print(f"Disabled missing OEM subdir: {subdir}/ in {mf_path}")
                                 mchanged = True
                                 mf_fixed_count += 1
