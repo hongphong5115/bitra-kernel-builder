@@ -10,7 +10,7 @@ on:
       branch:
         description: 'Kernel branch'
         required: true
-        default: 'android-13'
+        default: 'master'
 
 jobs:
   build:
@@ -33,20 +33,24 @@ jobs:
         mkdir -p toolchains
         cd toolchains
         
-        # Download Android Clang 10.0.7 (r383902)
-        echo "Downloading Android Clang..."
-        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b android10-release clang_repo
-        tar -xzf clang_repo/clang-r383902.tar.gz -C . 2>/dev/null || mv clang_repo/clang-r383902 clang
+        # Download Android Clang 10.0.7 (r383902) via sparse checkout
+        echo "Downloading Android Clang 10.0.7 (r383902)..."
+        git clone --depth=1 --filter=blob:none --sparse https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b android11-release clang_repo
+        (cd clang_repo && git sparse-checkout set clang-r383902)
+        mv clang_repo/clang-r383902 clang
+        rm -rf clang_repo
         
         # Download AArch64 GCC 4.9
-        echo "Downloading AArch64 GCC..."
+        echo "Downloading AArch64 GCC 4.9..."
         git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 gcc-arm64
         
         # Download ARM32 GCC 4.9 (for compat vdso)
+        echo "Downloading ARM32 GCC 4.9..."
         git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 gcc-arm
 
     - name: Clone Realme GT Neo 2 Kernel Source
       run: |
+        echo "Cloning Realme GT Neo 2 Kernel source (branch: ${{ github.event.inputs.branch }})..."
         git clone --depth=1 https://github.com/realme-kernel-opensource/realme_GTneo2-Q5pro-GTMasterExploratory-AndroidT-kernel-source -b ${{ github.event.inputs.branch }} kernel_src
 
     - name: Apply NoMount & SuSFS Patches
@@ -55,7 +59,7 @@ jobs:
         
         # 1. Apply NoMount built-in driver
         echo "Applying NoMount integration..."
-        curl -s https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh | bash -s dev
+        curl -s https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh | bash -s -- dev
         
         # 2. Check if SuSFS patch exists and apply
         if [ -f "../50_add_susfs_in_kernel-4.19.patch" ]; then
@@ -64,6 +68,7 @@ jobs:
           [ -f "../fs/susfs.c" ] && cp ../fs/susfs.c fs/
           [ -f "../include/linux/susfs.h" ] && cp ../include/linux/susfs.h include/linux/
           [ -f "../include/linux/susfs_def.h" ] && cp ../include/linux/susfs_def.h include/linux/
+          [ -f "../include/linux/sus_su.h" ] && cp ../include/linux/sus_su.h include/linux/
         fi
         
         # 3. Conceal NoMount symbols in kallsyms
@@ -114,14 +119,18 @@ jobs:
 
     - name: Patch Kernel with APatch kptools
       run: |
-        # Download latest kptools and kpimg
-        curl -sLO https://raw.githubusercontent.com/bmax121/APatch/main/assets/kpimg
-        curl -sLO https://raw.githubusercontent.com/bmax121/APatch/main/tools/linux/x86_64/kptools
-        chmod +x kptools
-        
         IMAGE=kernel_src/out/arch/arm64/boot/Image
-        ./kptools -p -i "$IMAGE" -k kpimg -s "${{ github.event.inputs.superkey }}" -o Image.patched
-        mv Image.patched "$IMAGE"
+        cp "$IMAGE" Image.unpatched
+        
+        if [ -n "${{ github.event.inputs.superkey }}" ]; then
+          echo "Patching Image with APatch kptools (SuperKey: ${{ github.event.inputs.superkey }})..."
+          curl -sLO https://github.com/bmax121/KernelPatch/releases/download/0.13.9/kpimg-android
+          curl -sLO https://github.com/bmax121/KernelPatch/releases/download/0.13.9/kptools-linux
+          chmod +x kptools-linux
+          ./kptools-linux -p -i "$IMAGE" -k kpimg-android -s "${{ github.event.inputs.superkey }}" -o Image.patched
+          mv Image.patched "$IMAGE"
+          echo "Kernel successfully pre-patched with APatch!"
+        fi
 
     - name: Package AnyKernel3
       run: |
@@ -132,11 +141,46 @@ jobs:
         cp kernel_src/out/arch/arm64/boot/Image anykernel/
         [ -f kernel_src/out/arch/arm64/boot/dtb ] && cp kernel_src/out/arch/arm64/boot/dtb anykernel/
         
-        # Configure AnyKernel3 banner for bitra
-        sed -i 's/device.name1=.*/device.name1=bitra/g' anykernel/anykernel.sh
-        sed -i 's/device.name2=.*/device.name2=RMX3370/g' anykernel/anykernel.sh
-        sed -i 's/block=.*/block=\/dev\/block\/bootdevice\/by-name\/boot/g' anykernel/anykernel.sh
-        sed -i 's/is_slot_device=1/is_slot_device=0/g' anykernel/anykernel.sh
+        # Create customized anykernel.sh for Realme GT Neo 2 (bitra)
+        cat << 'EOF' > anykernel/anykernel.sh
+        ### AnyKernel3 Ramdisk Mod Script
+        properties() { '
+        kernel.string=NoMount + SuSFS + APatch Kernel for Realme GT Neo 2 (bitra)
+        do.devicecheck=1
+        do.modules=0
+        do.systemless=1
+        do.cleanup=1
+        do.cleanuponabort=0
+        device.name1=bitra
+        device.name2=RMX3370
+        device.name3=
+        supported.versions=
+        supported.patchlevels=
+        supported.vendorpatchlevels=
+        '; } # end properties
+
+        ### AnyKernel install
+        boot_attributes() {
+        set_perm_recursive 0 0 755 644 $RAMDISK/*;
+        set_perm_recursive 0 0 750 750 $RAMDISK/init* $RAMDISK/sbin;
+        } # end attributes
+
+        # boot shell variables
+        BLOCK=/dev/block/bootdevice/by-name/boot;
+        IS_SLOT_DEVICE=0;
+        RAMDISK_COMPRESSION=auto;
+        PATCH_VBMETA_FLAG=auto;
+
+        # import functions/variables and setup patching
+        . tools/ak3-core.sh;
+
+        # boot install
+        dump_boot;
+        write_boot;
+        EOF
+        
+        # Clean indentation in generated script
+        sed -i 's/^[ \t]*//' anykernel/anykernel.sh
         
         cd anykernel
         zip -r9 ../AnyKernel3-NoMount-bitra.zip * -x README.md
@@ -145,4 +189,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: AnyKernel3-NoMount-bitra
-        path: AnyKernel3-NoMount-bitra.zip
+        path: |
+          AnyKernel3-NoMount-bitra.zip
+          Image.unpatched
