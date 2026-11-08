@@ -107,7 +107,7 @@ for root, dirs, files in os.walk("."):
 
 print(f"Universal Kconfig scanner completed. Total missing OEM sources disabled: {disabled_count}")
 
-# 6. Universal Makefile scanner for missing OEM subdirectories
+# 6. Universal Makefile scanner for missing OEM subdirectories & missing source objects
 mf_fixed_count = 0
 for root, dirs, files in os.walk("."):
     for f in files:
@@ -118,7 +118,9 @@ for root, dirs, files in os.walk("."):
                     mlines = mfile.readlines()
                 mchanged = False
                 out_mlines = []
+                whole_file = "".join(mlines)
                 for mline in mlines:
+                    # 6.1 Check subdirectories
                     m = re.search(r"^\s*obj-[^+=]*\+=\s*([a-zA-Z0-9_\-]+)/", mline)
                     if m:
                         subdir = m.group(1)
@@ -136,6 +138,35 @@ for root, dirs, files in os.walk("."):
                                 mchanged = True
                                 mf_fixed_count += 1
                                 continue
+                    
+                    # 6.2 Check individual missing object files (dangling OEM .c files)
+                    m_obj_line = re.search(r"^\s*obj-[^+=]*\+=\s*(.*)", mline)
+                    if m_obj_line and not m:
+                        tokens = m_obj_line.group(1).split()
+                        has_missing = False
+                        new_tokens = []
+                        for token in tokens:
+                            if token.endswith(".o"):
+                                base = token[:-2]
+                                c_src = os.path.join(root, base + ".c")
+                                s_src = os.path.join(root, base + ".S")
+                                s2_src = os.path.join(root, base + ".s")
+                                is_comp = (f"{base}-objs" in whole_file) or (f"{base}-y" in whole_file)
+                                if not os.path.exists(c_src) and not os.path.exists(s_src) and not os.path.exists(s2_src) and not is_comp:
+                                    has_missing = True
+                                    print(f"Disabled missing OEM source obj: {token} in {mf_path}")
+                                    continue
+                            new_tokens.append(token)
+                        if has_missing:
+                            mchanged = True
+                            mf_fixed_count += 1
+                            if new_tokens:
+                                prefix = mline[:m_obj_line.start(1)]
+                                out_mlines.append(prefix + " ".join(new_tokens) + "\n")
+                            else:
+                                out_mlines.append(f"# {mline.strip()} # disabled all missing sources\n")
+                            continue
+                            
                     out_mlines.append(mline)
                 if mchanged:
                     with open(mf_path, "w", encoding="utf-8") as mfile:
@@ -143,7 +174,7 @@ for root, dirs, files in os.walk("."):
             except Exception as e:
                 pass
 
-print(f"Universal Makefile scanner completed. Total missing OEM subdirs fixed: {mf_fixed_count}")
+print(f"Universal Makefile scanner completed. Total missing OEM targets fixed: {mf_fixed_count}")
 
 # 7. Comment out any missing healthinfo includes across the tree
 hi_count = 0
