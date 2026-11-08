@@ -57,11 +57,28 @@ jobs:
       run: |
         cd kernel_src
         
-        # 1. Apply NoMount built-in driver
+        # 1. Fix Python 2 gcc-wrapper.py warning blocker (turn into pure pass-through runner)
+        cat << 'EOF' > scripts/gcc-wrapper.py
+#! /usr/bin/env python3
+import sys, subprocess
+sys.exit(subprocess.call(sys.argv[1:]))
+EOF
+        chmod +x scripts/gcc-wrapper.py
+        
+        # 2. Fix missing proprietary Kconfig references and OEM awk parsing
+        mkdir -p kernel/sched_assist kernel/tuning
+        touch kernel/sched_assist/Kconfig kernel/tuning/Kconfig
+        sed -i 's/source "kernel\/sched_assist\/Kconfig"/# source "kernel\/sched_assist\/Kconfig"/g' init/Kconfig
+        sed -i 's/source "kernel\/tuning\/Kconfig"/# source "kernel\/tuning\/Kconfig"/g' init/Kconfig
+        sed -i '/#ifdef OPLUS_FEATURE_SCHED_ASSIST/d; /#endif \/\* OPLUS_FEATURE_SCHED_ASSIST \*\//d' init/Kconfig
+        sed -i '/#ifdef OPLUS_FEATURE_INPUT_BOOST_V4/d; /#endif \/\* OPLUS_FEATURE_INPUT_BOOST_V4 \*\//d' init/Kconfig
+        sed -i 's/awk -F '\''\/'\'' '\''{ print $$(NF-1) }'\''/awk -F '\''\/'\'' '\''NF>1 { print $$(NF-1) }'\''/g' OplusKernelEnvConfig.mk
+        
+        # 3. Apply NoMount built-in driver
         echo "Applying NoMount integration..."
         curl -s https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh | bash -s -- dev
         
-        # 2. Check if SuSFS patch exists and apply
+        # 4. Check if SuSFS patch exists and apply
         if [ -f "../50_add_susfs_in_kernel-4.19.patch" ]; then
           echo "Applying SuSFS 4.19 patch..."
           patch -p1 < ../50_add_susfs_in_kernel-4.19.patch || true
@@ -71,7 +88,7 @@ jobs:
           [ -f "../include/linux/sus_su.h" ] && cp ../include/linux/sus_su.h include/linux/
         fi
         
-        # 3. Conceal NoMount symbols in kallsyms
+        # 5. Conceal NoMount symbols in kallsyms
         if grep -q "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS" kernel/kallsyms.c; then
           sed -i 's/!strncmp(iter->name, "ksud", 4)/!strncmp(iter->name, "ksud", 4) || !strncmp(iter->name, "nm_", 3) || !strncmp(iter->name, "nomount_", 8)/g' kernel/kallsyms.c
         fi
