@@ -57,7 +57,6 @@ for dummy in ["kernel/sched_assist", "kernel/tuning"]:
 
 # 5. Universal Kconfig scanner
 # Refined regex: must match 'source' followed by quotes OR a path containing '/'
-# (Avoids matching regular English text like 'source clock' or 'source at' in help text)
 pattern = re.compile(r"^(\s*)source\s+(\"([^\"]+)\"|'([^']+)'|([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-./]+))")
 
 disabled_count = 0
@@ -75,6 +74,12 @@ for root, dirs, files in os.walk("."):
                     if m:
                         indent = m.group(1)
                         target = m.group(3) or m.group(4) or m.group(5)
+                        
+                        # CRITICAL: NEVER disable runtime Kconfig variables like $(SRCARCH) or $(ARCH)
+                        if "$" in target:
+                            out_lines.append(kline)
+                            continue
+                            
                         # Check relative to repo root or relative to current Kconfig file
                         if not os.path.exists(target) and not os.path.exists(os.path.join(root, target)):
                             print(f"Disabled missing OEM Kconfig in {fp}: {target}")

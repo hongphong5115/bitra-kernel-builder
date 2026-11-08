@@ -90,6 +90,7 @@ jobs:
         [ ! -f "arch/arm64/configs/$DEFCONFIG" ] && DEFCONFIG=vendor/kona_defconfig
         
         # Enable NoMount and Required Features
+        echo "CONFIG_64BIT=y" >> arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_NOMOUNT=y" >> arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_KEYS=y" >> arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_KEYS_COMPAT=y" >> arch/arm64/configs/$DEFCONFIG
