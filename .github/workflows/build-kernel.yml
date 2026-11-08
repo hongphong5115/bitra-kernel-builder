@@ -62,11 +62,7 @@ jobs:
         cd kernel_src
         
         # 1. Fix Python 2 gcc-wrapper.py warning blocker (turn into pure pass-through runner)
-        cat << 'EOF' > scripts/gcc-wrapper.py
-#! /usr/bin/env python3
-import sys, subprocess
-sys.exit(subprocess.call(sys.argv[1:]))
-EOF
+        printf '#! /usr/bin/env python3\nimport sys, subprocess\nsys.exit(subprocess.call(sys.argv[1:]))\n' > scripts/gcc-wrapper.py
         chmod +x scripts/gcc-wrapper.py
         
         # 2. Fix missing proprietary Kconfig references and OEM awk parsing
@@ -163,46 +159,8 @@ EOF
         cp kernel_src/out/arch/arm64/boot/Image anykernel/
         [ -f kernel_src/out/arch/arm64/boot/dtb ] && cp kernel_src/out/arch/arm64/boot/dtb anykernel/
         
-        # Create customized anykernel.sh for Realme GT Neo 2 (bitra)
-        cat << 'EOF' > anykernel/anykernel.sh
-        ### AnyKernel3 Ramdisk Mod Script
-        properties() { '
-        kernel.string=NoMount + SuSFS + APatch Kernel for Realme GT Neo 2 (bitra)
-        do.devicecheck=1
-        do.modules=0
-        do.systemless=1
-        do.cleanup=1
-        do.cleanuponabort=0
-        device.name1=bitra
-        device.name2=RMX3370
-        device.name3=
-        supported.versions=
-        supported.patchlevels=
-        supported.vendorpatchlevels=
-        '; } # end properties
-
-        ### AnyKernel install
-        boot_attributes() {
-        set_perm_recursive 0 0 755 644 $RAMDISK/*;
-        set_perm_recursive 0 0 750 750 $RAMDISK/init* $RAMDISK/sbin;
-        } # end attributes
-
-        # boot shell variables
-        BLOCK=/dev/block/bootdevice/by-name/boot;
-        IS_SLOT_DEVICE=0;
-        RAMDISK_COMPRESSION=auto;
-        PATCH_VBMETA_FLAG=auto;
-
-        # import functions/variables and setup patching
-        . tools/ak3-core.sh;
-
-        # boot install
-        dump_boot;
-        write_boot;
-        EOF
-        
-        # Clean indentation in generated script
-        sed -i 's/^[ \t]*//' anykernel/anykernel.sh
+        # Copy custom AnyKernel3 config
+        cp ../anykernel.sh anykernel/anykernel.sh
         
         cd anykernel
         zip -r9 ../AnyKernel3-NoMount-bitra.zip * -x README.md
