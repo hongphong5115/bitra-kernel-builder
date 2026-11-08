@@ -202,7 +202,15 @@ with open("include/soc/oplus/oplus_project.h", "w", encoding="utf-8") as f:
     f.write(oplus_project_header)
 print("Created include/soc/oplus/system/oplus_project.h and aliases")
 
-# 9.3 Create empty stubs for other stripped OEM headers
+# 9.3 Mirror all oppo headers and create stubs
+if os.path.exists("include/soc/oppo"):
+    for fname in os.listdir("include/soc/oppo"):
+        src = os.path.join("include/soc/oppo", fname)
+        if os.path.isfile(src):
+            shutil.copy2(src, os.path.join("include/soc/oplus/system", fname))
+            shutil.copy2(src, os.path.join("include/soc/oplus", fname))
+    print("Mirrored include/soc/oppo/* to include/soc/oplus/system/ and oplus/")
+
 empty_headers = [
     "include/soc/oplus/system/qcom_minidump_enhance.h",
     "include/soc/oplus/system/oplus_misc.h",
@@ -264,22 +272,35 @@ if os.path.exists("mm/vmscan.c"):
     with open("mm/vmscan.c", "r", encoding="utf-8", errors="ignore") as f:
         vmc = f.read()
     
-    # 10.1 Ensure #include <linux/proc_fs.h> is present
+    # 10.1 Ensure #include <linux/proc_fs.h> is present safely after debugfs.h
     if "#include <linux/proc_fs.h>" not in vmc:
-        vmc = "#include <linux/proc_fs.h>\n" + vmc
+        if "#include <linux/debugfs.h>" in vmc:
+            vmc = vmc.replace("#include <linux/debugfs.h>", "#include <linux/debugfs.h>\n#include <linux/proc_fs.h>")
+        else:
+            vmc = "#include <linux/proc_fs.h>\n" + vmc
         print("Added #include <linux/proc_fs.h> to mm/vmscan.c")
     
-    # 10.2 Declare direct_vm_swappiness unconditionally
-    old_guard = re.search(r"#if defined\(OPLUS_FEATURE_ZRAM_OPT\)[\s\S]*?int direct_vm_swappiness = \d+;[\s\S]*?#endif[^\n]*", vmc)
-    if old_guard:
-        vmc = vmc[:old_guard.start()] + "/* Direct reclaim swappiness */\nint direct_vm_swappiness = 60;" + vmc[old_guard.end():]
-        print("Unconditionally declared direct_vm_swappiness in mm/vmscan.c")
-    else:
-        # Fallback if pattern didn't match: insert declaration before hybridswapd_swappiness
-        if "direct_vm_swappiness" not in vmc[:20000]:
-            vmc = "int direct_vm_swappiness = 60;\n" + vmc
-            print("Prepended direct_vm_swappiness declaration to mm/vmscan.c")
+    # 10.2 Declare direct_vm_swappiness unconditionally (PRECISE match to avoid eating struct scan_control)
+    vmc = re.sub(
+        r"#if defined\(OPLUS_FEATURE_ZRAM_OPT\)\s*&&\s*defined\(CONFIG_OPLUS_ZRAM_OPT\)[\s\S]*?int direct_vm_swappiness = 60;\s*#endif[^\n]*",
+        "/* Direct reclaim swappiness */\nint direct_vm_swappiness = 60;",
+        vmc
+    )
+    print("Unconditionally declared direct_vm_swappiness in mm/vmscan.c")
             
     with open("mm/vmscan.c", "w", encoding="utf-8") as f:
         f.write(vmc)
     print("Fixed mm/vmscan.c")
+
+# 11. Fix kernel/printk/printk.c OEM UART skip in factory mode
+if os.path.exists("kernel/printk/printk.c"):
+    with open("kernel/printk/printk.c", "r", encoding="utf-8", errors="ignore") as f:
+        pkc = f.read()
+    pkc = re.sub(
+        r"#ifdef VENDOR_EDIT\s*\n\s*if\s*\(\(con->flags & CON_CONSDEV\)[\s\S]*?continue;\s*\n\s*#endif /\*VENDOR_EDIT\*/",
+        "// [DISABLED OEM UART SKIP]",
+        pkc
+    )
+    with open("kernel/printk/printk.c", "w", encoding="utf-8") as f:
+        f.write(pkc)
+    print("Fixed kernel/printk/printk.c OEM UART skip")
