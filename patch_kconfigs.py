@@ -169,3 +169,117 @@ if os.path.exists("fs/pstore/ram.c"):
     with open("fs/pstore/ram.c", "w", encoding="utf-8") as f:
         f.write(ramc)
     print("Fixed fs/pstore/ram.c syntax")
+
+# 9. Clean dangling OEM symlinks and provide missing OEM headers & stubs
+import shutil
+
+# 9.1 Replace dangling include/soc/oplus/system symlink with real directory
+oplus_sys = "include/soc/oplus/system"
+if os.path.islink(oplus_sys) or os.path.exists(oplus_sys):
+    try:
+        os.remove(oplus_sys)
+    except Exception:
+        shutil.rmtree(oplus_sys, ignore_errors=True)
+os.makedirs(oplus_sys, exist_ok=True)
+os.makedirs("include/soc/oplus", exist_ok=True)
+os.makedirs("drivers/oplus", exist_ok=True)
+
+# 9.2 Create stub oplus_project.h and oppo_project.h
+oplus_project_header = """#ifndef _OPLUS_SYSTEM_PROJECT_H_
+#define _OPLUS_SYSTEM_PROJECT_H_
+#include <linux/types.h>
+#include <soc/oppo/oppo_project.h>
+#ifndef oplus_daily_build
+static inline bool oplus_daily_build(void) { return false; }
+#endif
+#endif
+"""
+with open("include/soc/oplus/system/oplus_project.h", "w", encoding="utf-8") as f:
+    f.write(oplus_project_header)
+with open("include/soc/oplus/system/oppo_project.h", "w", encoding="utf-8") as f:
+    f.write(oplus_project_header)
+with open("include/soc/oplus/oplus_project.h", "w", encoding="utf-8") as f:
+    f.write(oplus_project_header)
+print("Created include/soc/oplus/system/oplus_project.h and aliases")
+
+# 9.3 Create empty stubs for other stripped OEM headers
+empty_headers = [
+    "include/soc/oplus/system/qcom_minidump_enhance.h",
+    "include/soc/oplus/system/oplus_misc.h",
+    "drivers/oplus/oplus_gauge.h"
+]
+for eh in empty_headers:
+    os.makedirs(os.path.dirname(eh), exist_ok=True)
+    with open(eh, "w", encoding="utf-8") as f:
+        f.write("#pragma once\n")
+    print(f"Created stub header: {eh}")
+
+# 9.4 Create kernel/oplus_project_stub.c and register in kernel/Makefile
+stub_c_content = """// SPDX-License-Identifier: GPL-2.0
+#include <linux/types.h>
+#include <linux/export.h>
+
+unsigned int __attribute__((weak)) get_project(void) { return 0; }
+EXPORT_SYMBOL(get_project);
+
+int __attribute__((weak)) get_PCB_Version(void) { return 0; }
+EXPORT_SYMBOL(get_PCB_Version);
+
+int __attribute__((weak)) get_eng_version(void) { return 0; }
+EXPORT_SYMBOL(get_eng_version);
+
+int32_t __attribute__((weak)) get_Modem_Version(void) { return 0; }
+EXPORT_SYMBOL(get_Modem_Version);
+
+int32_t __attribute__((weak)) get_Operator_Version(void) { return 0; }
+EXPORT_SYMBOL(get_Operator_Version);
+
+bool __attribute__((weak)) is_confidential(void) { return false; }
+EXPORT_SYMBOL(is_confidential);
+
+bool __attribute__((weak)) oppo_daily_build(void) { return false; }
+EXPORT_SYMBOL(oppo_daily_build);
+
+bool __attribute__((weak)) oplus_daily_build(void) { return false; }
+EXPORT_SYMBOL(oplus_daily_build);
+
+uint32_t __attribute__((weak)) get_oppo_feature(int index) { return 0; }
+EXPORT_SYMBOL(get_oppo_feature);
+"""
+with open("kernel/oplus_project_stub.c", "w", encoding="utf-8") as f:
+    f.write(stub_c_content)
+print("Created kernel/oplus_project_stub.c")
+
+if os.path.exists("kernel/Makefile"):
+    with open("kernel/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        kmf = f.read()
+    if "oplus_project_stub.o" not in kmf:
+        kmf += "\nobj-y += oplus_project_stub.o\n"
+        with open("kernel/Makefile", "w", encoding="utf-8") as f:
+            f.write(kmf)
+        print("Registered oplus_project_stub.o in kernel/Makefile")
+
+# 10. Fix mm/vmscan.c direct_vm_swappiness and proc_create
+if os.path.exists("mm/vmscan.c"):
+    with open("mm/vmscan.c", "r", encoding="utf-8", errors="ignore") as f:
+        vmc = f.read()
+    
+    # 10.1 Ensure #include <linux/proc_fs.h> is present
+    if "#include <linux/proc_fs.h>" not in vmc:
+        vmc = "#include <linux/proc_fs.h>\n" + vmc
+        print("Added #include <linux/proc_fs.h> to mm/vmscan.c")
+    
+    # 10.2 Declare direct_vm_swappiness unconditionally
+    old_guard = re.search(r"#if defined\(OPLUS_FEATURE_ZRAM_OPT\)[\s\S]*?int direct_vm_swappiness = \d+;[\s\S]*?#endif[^\n]*", vmc)
+    if old_guard:
+        vmc = vmc[:old_guard.start()] + "/* Direct reclaim swappiness */\nint direct_vm_swappiness = 60;" + vmc[old_guard.end():]
+        print("Unconditionally declared direct_vm_swappiness in mm/vmscan.c")
+    else:
+        # Fallback if pattern didn't match: insert declaration before hybridswapd_swappiness
+        if "direct_vm_swappiness" not in vmc[:20000]:
+            vmc = "int direct_vm_swappiness = 60;\n" + vmc
+            print("Prepended direct_vm_swappiness declaration to mm/vmscan.c")
+            
+    with open("mm/vmscan.c", "w", encoding="utf-8") as f:
+        f.write(vmc)
+    print("Fixed mm/vmscan.c")
