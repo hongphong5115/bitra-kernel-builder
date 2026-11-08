@@ -752,6 +752,52 @@ if os.path.exists("drivers/soc/qcom/socinfo.c"):
         f.write(soc_c)
     print("Fixed drivers/soc/qcom/socinfo.c syntax")
 
+# 27. Fix drivers/soc/qcom/fsa4480-i2c.c missing dsi/dsi_display.h
+if os.path.exists("drivers/soc/qcom/fsa4480-i2c.c"):
+    with open("drivers/soc/qcom/fsa4480-i2c.c", "r", encoding="utf-8", errors="ignore") as f:
+        fc = f.read()
+    fc = re.sub(r'#include\s*["<]dsi/dsi_display\.h[">]', '// #include "dsi/dsi_display.h"', fc)
+    fc = re.sub(
+        r'struct dsi_display\s*\*display\s*=\s*get_main_display\(\);[\s\S]*?bool oplus_dp_support\s*=\s*[^;]+;',
+        'bool oplus_dp_support = false;',
+        fc
+    )
+    with open("drivers/soc/qcom/fsa4480-i2c.c", "w", encoding="utf-8") as f:
+        f.write(fc)
+    print("Fixed drivers/soc/qcom/fsa4480-i2c.c dsi dependency")
+
+# 28. Fix drivers/staging/android/hans.c missing NETLINK_OPPO_HANS
+if os.path.exists("include/uapi/linux/netlink.h"):
+    with open("include/uapi/linux/netlink.h", "r", encoding="utf-8", errors="ignore") as f:
+        nlc = f.read()
+    nlc = re.sub(
+        r"#ifdef\s+OPLUS_FEATURE_HANS_FREEZE\s*\n\s*#define\s+NETLINK_OPPO_HANS\s+(\d+)\s*[\s\S]*?#endif\s*/\*OPLUS_FEATURE_HANS_FREEZE\*/",
+        r"#define NETLINK_OPPO_HANS \1",
+        nlc
+    )
+    with open("include/uapi/linux/netlink.h", "w", encoding="utf-8") as f:
+        f.write(nlc)
+    print("Made NETLINK_OPPO_HANS unconditional in include/uapi/linux/netlink.h")
+
+if os.path.exists("drivers/staging/android/hans.c"):
+    with open("drivers/staging/android/hans.c", "r", encoding="utf-8", errors="ignore") as f:
+        hc = f.read()
+    if "#define NETLINK_OPPO_HANS" not in hc:
+        hc = "#ifndef NETLINK_OPPO_HANS\n#define NETLINK_OPPO_HANS 29\n#endif\n" + hc
+    with open("drivers/staging/android/hans.c", "w", encoding="utf-8") as f:
+        f.write(hc)
+    print("Injected NETLINK_OPPO_HANS into drivers/staging/android/hans.c")
+
+if os.path.exists("include/linux/hans.h"):
+    with open("include/linux/hans.h", "r", encoding="utf-8", errors="ignore") as f:
+        hhc = f.read()
+    if "#define NETLINK_OPPO_HANS" not in hhc:
+        hhc = "#ifndef NETLINK_OPPO_HANS\n#define NETLINK_OPPO_HANS 29\n#endif\n" + hhc
+    with open("include/linux/hans.h", "w", encoding="utf-8") as f:
+        f.write(hhc)
+    print("Injected NETLINK_OPPO_HANS into include/linux/hans.h")
+
+
 
 
 
