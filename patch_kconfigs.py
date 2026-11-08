@@ -953,6 +953,24 @@ if os.path.exists("include/linux/swap.h"):
             f.write(swh)
         print("Injected extern kswapd_unbind_cpu into include/linux/swap.h")
 
+# 38. Neutralize healthinfo in mm/Makefile
+if os.path.exists("mm/Makefile"):
+    with open("mm/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        mmf = f.read()
+    mmf = re.sub(r'obj-y\s*\+=\s*healthinfo\/', '# obj-y += healthinfo/', mmf)
+    with open("mm/Makefile", "w", encoding="utf-8") as f:
+        f.write(mmf)
+    print("Neutralized healthinfo in mm/Makefile")
+
+# 39. Neutralize special_opt in kernel/Makefile
+if os.path.exists("kernel/Makefile"):
+    with open("kernel/Makefile", "r", encoding="utf-8", errors="ignore") as f:
+        kmf = f.read()
+    kmf = re.sub(r'obj-y\s*\+=\s*special_opt\/', '# obj-y += special_opt/', kmf)
+    with open("kernel/Makefile", "w", encoding="utf-8") as f:
+        f.write(kmf)
+    print("Neutralized special_opt in kernel/Makefile")
+
 
 
 
