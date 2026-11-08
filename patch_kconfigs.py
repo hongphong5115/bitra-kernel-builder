@@ -428,3 +428,42 @@ if os.path.exists("net/oplus_nwpower/oplus_nwpower.c"):
     with open("net/oplus_nwpower/oplus_nwpower.c", "w", encoding="utf-8") as f:
         f.write(nwc)
     print("Fixed net/oplus_nwpower/oplus_nwpower.c get_cached_platform_id")
+
+# 17. Neutralize unbuildable proprietary ST laser autofocus driver (vl53L1)
+# 17.1 Create stub header cam_cci_ctrl_interface.h in vl53L1/kona so any includes pass cleanly
+vl53_kona_dir = "drivers/input/misc/vl53L1/kona"
+if os.path.exists(vl53_kona_dir):
+    stub_content = """#ifndef _CAM_CCI_CTRL_INTERFACE_H_
+#define _CAM_CCI_CTRL_INTERFACE_H_
+struct camera_cci_transfer {
+    int cmd;
+};
+#define CAMERA_CCI_INIT 0
+#define CAMERA_CCI_RELEASE 1
+static inline int cam_cci_control_interface(struct camera_cci_transfer *p) { return 0; }
+#endif
+"""
+    with open(os.path.join(vl53_kona_dir, "cam_cci_ctrl_interface.h"), "w", encoding="utf-8") as f:
+        f.write(stub_content)
+    print("Created stub cam_cci_ctrl_interface.h in drivers/input/misc/vl53L1/kona/")
+
+# 17.2 Comment out vl53L1 in drivers/input/misc/Makefile
+misc_mk = "drivers/input/misc/Makefile"
+if os.path.exists(misc_mk):
+    with open(misc_mk, "r", encoding="utf-8", errors="ignore") as f:
+        mkc = f.read()
+    mkc = re.sub(r"(\bobj-\$\(CONFIG_STMVL53L1\)\s*\+=\s*vl53L1/)", r"# \1", mkc)
+    with open(misc_mk, "w", encoding="utf-8") as f:
+        f.write(mkc)
+    print("Disabled vl53L1 in drivers/input/misc/Makefile")
+
+# 17.3 Disable CONFIG_STMVL53L1 in defconfigs
+for defcfg in ["arch/arm64/configs/vendor/kona-perf_defconfig", "arch/arm64/configs/vendor/kona_defconfig"]:
+    if os.path.exists(defcfg):
+        with open(defcfg, "r", encoding="utf-8", errors="ignore") as f:
+            dc = f.read()
+        dc = re.sub(r"CONFIG_STMVL53L1=y", "CONFIG_STMVL53L1=n", dc)
+        with open(defcfg, "w", encoding="utf-8") as f:
+            f.write(dc)
+        print(f"Disabled CONFIG_STMVL53L1 in {defcfg}")
+

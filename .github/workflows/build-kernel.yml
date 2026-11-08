@@ -97,6 +97,10 @@ jobs:
         echo "CONFIG_KALLSYMS=y" >> arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_KALLSYMS_ALL=y" >> arch/arm64/configs/$DEFCONFIG
         
+        # Disable proprietary unbuildable VL53L1 laser sensor
+        sed -i '/CONFIG_STMVL53L1/d' arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_STMVL53L1=n" >> arch/arm64/configs/$DEFCONFIG
+        
         # Enable SuSFS
         echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/$DEFCONFIG

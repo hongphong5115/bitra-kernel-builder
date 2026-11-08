@@ -1,14 +1,16 @@
 ### AnyKernel3 Ramdisk Mod Script
 properties() { '
-kernel.string=NoMount + SuSFS + APatch Kernel for Realme GT Neo 2 (bitra)
-do.devicecheck=1
+kernel.string=NoMount + SuSFS + APatch Kernel for Realme GT Neo 2 (bitra/RE5473)
+do.devicecheck=0
 do.modules=0
 do.systemless=1
 do.cleanup=1
 do.cleanuponabort=0
 device.name1=bitra
 device.name2=RMX3370
-device.name3=
+device.name3=RE5473
+device.name4=RE5473L1
+device.name5=
 supported.versions=
 supported.patchlevels=
 supported.vendorpatchlevels=
