@@ -56,6 +56,10 @@ for dummy in ["kernel/sched_assist", "kernel/tuning"]:
         print(f"Removed dummy gitlink: {dummy}")
 
 # 5. Universal Kconfig scanner
+# Refined regex: must match 'source' followed by quotes OR a path containing '/'
+# (Avoids matching regular English text like 'source clock' or 'source at' in help text)
+pattern = re.compile(r"^(\s*)source\s+(\"([^\"]+)\"|'([^']+)'|([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-./]+))")
+
 disabled_count = 0
 for root, dirs, files in os.walk("."):
     for f in files:
@@ -67,12 +71,14 @@ for root, dirs, files in os.walk("."):
                 changed = False
                 out_lines = []
                 for kline in klines:
-                    m = re.match(r"^\s*source\s+[\"']?([^\"'\s]+)[\"']?", kline)
+                    m = pattern.match(kline)
                     if m:
-                        target = m.group(1).strip("\"' ")
+                        indent = m.group(1)
+                        target = m.group(3) or m.group(4) or m.group(5)
                         # Check relative to repo root or relative to current Kconfig file
                         if not os.path.exists(target) and not os.path.exists(os.path.join(root, target)):
-                            out_lines.append(f"# {kline.strip()} # disabled missing OEM Kconfig\n")
+                            print(f"Disabled missing OEM Kconfig in {fp}: {target}")
+                            out_lines.append(f"{indent}# source \"{target}\" # disabled missing OEM Kconfig\n")
                             changed = True
                             disabled_count += 1
                             continue
