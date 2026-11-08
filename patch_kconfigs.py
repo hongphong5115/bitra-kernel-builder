@@ -930,6 +930,28 @@ for dc in [
         with open(dc, "a", encoding="utf-8") as f:
             f.write("\nCONFIG_OPLUS_HEALTHINFO=n\nCONFIG_OPLUS_JANK_INFO=n\n")
 
+# 37. Fix kswapd_unbind_cpu in kernel/sched/core.c and include/linux/swap.h
+if os.path.exists("kernel/sched/core.c"):
+    with open("kernel/sched/core.c", "r", encoding="utf-8", errors="ignore") as f:
+        scc = f.read()
+    if "int kswapd_unbind_cpu" not in scc:
+        scc = scc.replace(
+            "void upate_kswapd_unbind_cpu(void)",
+            "int kswapd_unbind_cpu = -1;\nEXPORT_SYMBOL(kswapd_unbind_cpu);\nvoid upate_kswapd_unbind_cpu(void)"
+        )
+        with open("kernel/sched/core.c", "w", encoding="utf-8") as f:
+            f.write(scc)
+        print("Injected kswapd_unbind_cpu into kernel/sched/core.c")
+
+if os.path.exists("include/linux/swap.h"):
+    with open("include/linux/swap.h", "r", encoding="utf-8", errors="ignore") as f:
+        swh = f.read()
+    if "extern int kswapd_unbind_cpu;" not in swh:
+        swh += "\nextern int kswapd_unbind_cpu;\n"
+        with open("include/linux/swap.h", "w", encoding="utf-8") as f:
+            f.write(swh)
+        print("Injected extern kswapd_unbind_cpu into include/linux/swap.h")
+
 
 
 
