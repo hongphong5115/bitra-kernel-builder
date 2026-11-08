@@ -549,6 +549,19 @@ if os.path.exists("drivers/power/supply/qcom/qpnp-fg-gen4.c"):
         f.write(fgc)
     print("Fixed drivers/power/supply/qcom/qpnp-fg-gen4.c batt_therm_chan declaration")
 
+# 22. Fix drivers/scsi/ufs/ufshcd.h non-static declarations when OPLUS_FEATURE_UFSPLUS is not set
+if os.path.exists("drivers/scsi/ufs/ufshcd.h"):
+    with open("drivers/scsi/ufs/ufshcd.h", "r", encoding="utf-8", errors="ignore") as f:
+        uhc = f.read()
+    uhc = uhc.replace(
+        "#if defined(CONFIG_UFSFEATURE)\nint ufshcd_exec_dev_cmd",
+        "#if defined(CONFIG_UFSFEATURE) && defined(OPLUS_FEATURE_UFSPLUS)\nint ufshcd_exec_dev_cmd"
+    )
+    with open("drivers/scsi/ufs/ufshcd.h", "w", encoding="utf-8") as f:
+        f.write(uhc)
+    print("Fixed drivers/scsi/ufs/ufshcd.h UFSFEATURE declarations")
+
+
 
 
 
