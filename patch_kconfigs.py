@@ -610,11 +610,11 @@ if os.path.exists("drivers/staging/android/ion/ion_system_heap.c"):
     if "NR_IONCACHE_PAGES" in ic and "#define NR_IONCACHE_PAGES" not in ic:
         ic = "#ifndef NR_IONCACHE_PAGES\n#define NR_IONCACHE_PAGES NR_FREE_PAGES\n#endif\n" + ic
     # Stub fill_pool_kworkthread to return 0 immediately instead of while-looping
-    ic = re.sub(
-        r"static int fill_pool_kworkthread\(void \*p\)[\s\S]*?\n\}",
-        "static int fill_pool_kworkthread(void *p)\n{\n\tpr_info(\"boot time ION pool filling finished\\n\");\n\treturn 0;\n}",
-        ic
-    )
+    if "static int fill_pool_kworkthread(void *p)" in ic:
+        ic = ic.replace(
+            "static int fill_pool_kworkthread(void *p)\n{",
+            "static int fill_pool_kworkthread(void *p)\n{\n\treturn 0;"
+        )
     with open("drivers/staging/android/ion/ion_system_heap.c", "w", encoding="utf-8") as f:
         f.write(ic)
     print("Fixed drivers/staging/android/ion/ion_system_heap.c")
@@ -739,6 +739,19 @@ extern bool oem_is_fulldump(void);
     with open("drivers/soc/qcom/subsystem_restart.c", "w", encoding="utf-8") as f:
         f.write(src)
     print("Injected OPLUS_BUG_STABILITY into drivers/soc/qcom/subsystem_restart.c")
+
+# 26. Fix drivers/soc/qcom/socinfo.c unmatched brace in msm_read_hardware_id
+if os.path.exists("drivers/soc/qcom/socinfo.c"):
+    with open("drivers/soc/qcom/socinfo.c", "r", encoding="utf-8", errors="ignore") as f:
+        soc_c = f.read()
+    pattern = r'(\tif \(!cpu_of_id\[socinfo->v0_1\.id\]\.soc_id_string\)\s*goto err_path;\s*\n)#ifdef\s+OPLUS_ARCH_EXTENDS[\s\S]*?#endif\s*\n\s*ret = strlcat\(msm_soc_str, cpu_of_id\[socinfo->v0_1\.id\]\.soc_id_string,\s*\n\s*sizeof\(msm_soc_str\)\);\s*\n\s*\}'
+    repl = r'''\1	ret = strlcat(msm_soc_str, cpu_of_id[socinfo->v0_1.id].soc_id_string,
+			sizeof(msm_soc_str));'''
+    soc_c = re.sub(pattern, repl, soc_c)
+    with open("drivers/soc/qcom/socinfo.c", "w", encoding="utf-8") as f:
+        f.write(soc_c)
+    print("Fixed drivers/soc/qcom/socinfo.c syntax")
+
 
 
 
