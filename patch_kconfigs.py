@@ -1091,6 +1091,39 @@ for sucompat in [
                 f.write(suc)
             print(f"Patched linux/pgtable.h in {sucompat}")
 
+# 46. Fix unused temp in techpack/audio/soc/swr-mstr-ctrl.c
+swr_path = "techpack/audio/soc/swr-mstr-ctrl.c"
+if os.path.exists(swr_path):
+    with open(swr_path, "r", encoding="utf-8", errors="ignore") as f:
+        swrc = f.read()
+    swrc = swrc.replace(
+        "status = swr_master_read(swrm, SWRM_MCP_SLV_STATUS);",
+        "status = swr_master_read(swrm, SWRM_MCP_SLV_STATUS);\n\t(void)temp;"
+    )
+    with open(swr_path, "w", encoding="utf-8") as f:
+        f.write(swrc)
+    print("Fixed unused temp in swr-mstr-ctrl.c")
+
+# 47. Fix trigger_id in techpack/camera/drivers/cam_isp/cam_isp_context.c
+isp_path = "techpack/camera/drivers/cam_isp/cam_isp_context.c"
+if os.path.exists(isp_path):
+    with open(isp_path, "r", encoding="utf-8", errors="ignore") as f:
+        ispc = f.read()
+    target_trig = """#ifdef OPLUS_FEATURE_CAMERA_COMMON
+\t\t\tnotify.req_id = ctx_isp->req_info.last_bufdone_req_id;
+#endif
+\t\t\tnotify.sof_timestamp_val = ctx_isp->sof_timestamp_val;
+\t\t\tnotify.trigger_id = ctx_isp->trigger_id;"""
+    repl_trig = """#ifdef OPLUS_FEATURE_CAMERA_COMMON
+\t\t\tnotify.req_id = ctx_isp->req_info.last_bufdone_req_id;
+\t\t\tnotify.trigger_id = ctx_isp->trigger_id;
+#endif
+\t\t\tnotify.sof_timestamp_val = ctx_isp->sof_timestamp_val;"""
+    ispc = ispc.replace(target_trig, repl_trig)
+    with open(isp_path, "w", encoding="utf-8") as f:
+        f.write(ispc)
+    print("Fixed trigger_id in cam_isp_context.c")
+
 
 
 

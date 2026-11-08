@@ -43,7 +43,7 @@ jobs:
         
         # 2. Integrate KernelSU-Next (native SuSFS support)
         echo "Integrating KernelSU-Next..."
-        curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh" | bash -s dev
+        curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/legacy/kernel/setup.sh" | bash -s legacy
         python3 -c "import os; [open(os.path.join(r, f), 'w').write(open(os.path.join(r, f), 'r', errors='ignore').read().replace('<linux/pgtable.h>', '<asm/pgtable.h>')) for r, d, fs in os.walk('drivers/kernelsu') for f in fs if f.endswith(('.c', '.h')) and '<linux/pgtable.h>' in open(os.path.join(r, f), 'r', errors='ignore').read()]"
         python3 -c "import os; [open(os.path.join(r, f), 'w').write('#include <linux/version.h>\n#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)\n#define copy_to_kernel_nofault probe_kernel_write\n#endif\n' + open(os.path.join(r, f), 'r', errors='ignore').read()) for r, d, fs in os.walk('drivers/kernelsu') for f in fs if f.endswith(('.c', '.h')) and 'copy_to_kernel_nofault' in open(os.path.join(r, f), 'r', errors='ignore').read()]"
         
