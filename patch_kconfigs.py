@@ -42,18 +42,30 @@ if os.path.exists("OplusKernelEnvConfig.mk"):
         f.writelines(new_lines)
     print("Cleaned OplusKernelEnvConfig.mk powerinfo block")
 
-# 4. Remove OEM dummy gitlinks if they exist
-for dummy in ["kernel/sched_assist", "kernel/tuning"]:
-    if os.path.exists(dummy):
-        if os.path.isdir(dummy) and not os.path.islink(dummy):
-            import shutil
-            shutil.rmtree(dummy, ignore_errors=True)
-        else:
+# 4. Universal Dangling OEM Symlink & Dummy Gitlink Cleaner
+import shutil
+dangling_symlinks = 0
+for root, dirs, files in os.walk(".", followlinks=False):
+    for name in files + dirs:
+        p = os.path.join(root, name)
+        if os.path.islink(p):
+            if not os.path.exists(p):
+                try:
+                    os.remove(p)
+                    dangling_symlinks += 1
+                except Exception:
+                    try:
+                        shutil.rmtree(p, ignore_errors=True)
+                        dangling_symlinks += 1
+                    except Exception:
+                        pass
+        elif name in ["sched_assist", "tuning"] and ("kernel" in root):
             try:
-                os.remove(dummy)
+                shutil.rmtree(p, ignore_errors=True)
+                dangling_symlinks += 1
             except Exception:
                 pass
-        print(f"Removed dummy gitlink: {dummy}")
+print(f"Universal dangling symlink cleaner completed. Total removed: {dangling_symlinks}")
 
 # 5. Universal Kconfig scanner
 pattern = re.compile(r"^(\s*)source\s+(\"([^\"]+)\"|'([^']+)'|([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-./]+))")
@@ -184,7 +196,29 @@ os.makedirs(oplus_sys, exist_ok=True)
 os.makedirs("include/soc/oplus", exist_ok=True)
 os.makedirs("drivers/oplus", exist_ok=True)
 
-# 9.2 Create stub oplus_project.h and oppo_project.h
+# 9.2 Safe copy and write helper functions
+def safe_write(path, content):
+    if os.path.islink(path) or os.path.exists(path):
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+def safe_copy(src, dst):
+    if os.path.islink(dst) or os.path.exists(dst):
+        try:
+            os.remove(dst)
+        except Exception:
+            pass
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    try:
+        shutil.copy2(src, dst)
+    except Exception as e:
+        print(f"safe_copy error: {src} -> {dst}: {e}")
+
 oplus_project_header = """#ifndef _OPLUS_SYSTEM_PROJECT_H_
 #define _OPLUS_SYSTEM_PROJECT_H_
 #include <linux/types.h>
@@ -194,12 +228,12 @@ static inline bool oplus_daily_build(void) { return false; }
 #endif
 #endif
 """
-with open("include/soc/oplus/system/oplus_project.h", "w", encoding="utf-8") as f:
-    f.write(oplus_project_header)
-with open("include/soc/oplus/system/oppo_project.h", "w", encoding="utf-8") as f:
-    f.write(oplus_project_header)
-with open("include/soc/oplus/oplus_project.h", "w", encoding="utf-8") as f:
-    f.write(oplus_project_header)
+for target_header in [
+    "include/soc/oplus/system/oplus_project.h",
+    "include/soc/oplus/system/oppo_project.h",
+    "include/soc/oplus/oplus_project.h",
+]:
+    safe_write(target_header, oplus_project_header)
 print("Created include/soc/oplus/system/oplus_project.h and aliases")
 
 # 9.3 Mirror all oppo headers and create stubs
@@ -207,8 +241,8 @@ if os.path.exists("include/soc/oppo"):
     for fname in os.listdir("include/soc/oppo"):
         src = os.path.join("include/soc/oppo", fname)
         if os.path.isfile(src):
-            shutil.copy2(src, os.path.join("include/soc/oplus/system", fname))
-            shutil.copy2(src, os.path.join("include/soc/oplus", fname))
+            safe_copy(src, os.path.join("include/soc/oplus/system", fname))
+            safe_copy(src, os.path.join("include/soc/oplus", fname))
     print("Mirrored include/soc/oppo/* to include/soc/oplus/system/ and oplus/")
 
 empty_headers = [
@@ -217,9 +251,7 @@ empty_headers = [
     "drivers/oplus/oplus_gauge.h"
 ]
 for eh in empty_headers:
-    os.makedirs(os.path.dirname(eh), exist_ok=True)
-    with open(eh, "w", encoding="utf-8") as f:
-        f.write("#pragma once\n")
+    safe_write(eh, "#pragma once\n")
     print(f"Created stub header: {eh}")
 
 # 9.4 Create kernel/oplus_project_stub.c and register in kernel/Makefile
