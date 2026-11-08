@@ -362,3 +362,16 @@ if os.path.exists("kernel/exit.c"):
     with open("kernel/exit.c", "w", encoding="utf-8") as f:
         f.write(ec)
     print("Fixed kernel/exit.c dangling is_critial_process call")
+
+# 14. Fix kernel/sysctl.c two_hundred declaration
+if os.path.exists("kernel/sysctl.c"):
+    with open("kernel/sysctl.c", "r", encoding="utf-8", errors="ignore") as f:
+        scc = f.read()
+    scc = re.sub(
+        r"#if defined\(OPLUS_FEATURE_ZRAM_OPT\)\s*&&\s*defined\(CONFIG_OPLUS_ZRAM_OPT\)[\s\S]*?static int two_hundred = 200;\s*#endif[^\n]*",
+        "static int two_hundred = 200;\nextern int direct_vm_swappiness;",
+        scc
+    )
+    with open("kernel/sysctl.c", "w", encoding="utf-8") as f:
+        f.write(scc)
+    print("Fixed kernel/sysctl.c two_hundred declaration")
