@@ -1136,6 +1136,38 @@ if os.path.exists(crm_h_path):
         f.write(crmh)
     print("Fixed trigger_id in cam_req_mgr_interface.h")
 
+# 48. Fix cam_ois_core.c undeclared CAM_GET_OIS_EIS_HALL
+ois_path = "techpack/camera/drivers/cam_sensor_module/cam_ois/cam_ois_core.c"
+if os.path.exists(ois_path):
+    with open(ois_path, "r", encoding="utf-8", errors="ignore") as f:
+        oisc = f.read()
+    target_ois = """#ifdef OPLUS_FEATURE_CAMERA_COMMON
+       case CAM_GET_OIS_EIS_HALL:
+       case CAM_WRITE_CALIBRATION_DATA:
+       case CAM_WRITE_AE_SYNC_DATA:{
+           rc = oplus_cam_ois_driver_cmd(o_ctrl,arg);
+           if (rc < 0){
+               goto release_mutex;
+           }
+           break;
+       }
+#endif"""
+    repl_ois = """#if 0
+       case CAM_GET_OIS_EIS_HALL:
+       case CAM_WRITE_CALIBRATION_DATA:
+       case CAM_WRITE_AE_SYNC_DATA:{
+           rc = oplus_cam_ois_driver_cmd(o_ctrl,arg);
+           if (rc < 0){
+               goto release_mutex;
+           }
+           break;
+       }
+#endif"""
+    oisc = oisc.replace(target_ois, repl_ois)
+    with open(ois_path, "w", encoding="utf-8") as f:
+        f.write(oisc)
+    print("Fixed CAM_GET_OIS_EIS_HALL in cam_ois_core.c")
+
 
 
 
