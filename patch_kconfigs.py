@@ -826,23 +826,16 @@ if os.path.exists("drivers/usb/pd/policy_engine.c"):
             f.write(pec)
         print("Added oplus_wpc_set_wrx_en_value stub to policy_engine.c")
 
-# 31. Fix kernel/panic_flush.c & msm-poweroff.c is_fulldump_enable
+# 31. Fix kernel/panic_flush.c is_fulldump_enable
 if os.path.exists("kernel/panic_flush.c"):
     with open("kernel/panic_flush.c", "r", encoding="utf-8", errors="ignore") as f:
         pfc = f.read()
-    if "bool is_fulldump_enable" not in pfc:
+    pfc = pfc.replace("extern bool is_fulldump_enable(void);", "bool is_fulldump_enable(void) { return false; }")
+    if "bool is_fulldump_enable(void)" not in pfc:
         pfc = "bool is_fulldump_enable(void) { return false; }\n" + pfc
-        with open("kernel/panic_flush.c", "w", encoding="utf-8") as f:
-            f.write(pfc)
-        print("Added is_fulldump_enable stub to kernel/panic_flush.c")
-
-if os.path.exists("drivers/power/reset/msm-poweroff.c"):
-    with open("drivers/power/reset/msm-poweroff.c", "r", encoding="utf-8", errors="ignore") as f:
-        mpc = f.read()
-    mpc = re.sub(r"#ifdef\s+OPLUS_BUG_STABILITY\s*\n\s*bool\s+is_fulldump_enable\(void\)", "bool is_fulldump_enable(void)", mpc)
-    with open("drivers/power/reset/msm-poweroff.c", "w", encoding="utf-8") as f:
-        f.write(mpc)
-    print("Made is_fulldump_enable unconditional in msm-poweroff.c")
+    with open("kernel/panic_flush.c", "w", encoding="utf-8") as f:
+        f.write(pfc)
+    print("Defined is_fulldump_enable in kernel/panic_flush.c")
 
 # 32. Fix drivers/power/supply/qcom/Makefile schgm-flash.o without smb5-lib
 if os.path.exists("drivers/power/supply/qcom/Makefile"):
