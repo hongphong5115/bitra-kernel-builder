@@ -1168,6 +1168,21 @@ if os.path.exists(ois_path):
         f.write(oisc)
     print("Fixed CAM_GET_OIS_EIS_HALL in cam_ois_core.c")
 
+# 49. Fix oplus_cam_actuator_core.c
+act_path = "techpack/camera/drivers/cam_sensor_module/oplus/cam_actuator/oplus_cam_actuator_core.c"
+if os.path.exists(act_path):
+    with open(act_path, "r", encoding="utf-8", errors="ignore") as f:
+        actc = f.read()
+    actc = re.sub(
+        r'int32_t oplus_cam_actuator_power_up\(struct cam_actuator_ctrl_t \*a_ctrl\)[\s\S]*?^}',
+        'int32_t oplus_cam_actuator_power_up(struct cam_actuator_ctrl_t *a_ctrl) { return 0; }',
+        actc,
+        flags=re.MULTILINE
+    )
+    with open(act_path, "w", encoding="utf-8") as f:
+        f.write(actc)
+    print("Stubbed oplus_cam_actuator_power_up in oplus_cam_actuator_core.c")
+
 
 
 
