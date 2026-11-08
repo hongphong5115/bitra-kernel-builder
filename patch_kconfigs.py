@@ -266,8 +266,9 @@ for target_header in [
     "include/soc/oplus/system/oppo_project.h",
     "include/soc/oplus/oplus_project.h",
 ]:
-    safe_write(target_header, oplus_project_header)
-print("Created include/soc/oplus/system/oplus_project.h and aliases")
+    if not os.path.exists(target_header):
+        safe_write(target_header, oplus_project_header)
+print("Ensured include/soc/oplus/system/oplus_project.h and aliases exist")
 
 # 9.3 Mirror all oppo headers and create stubs
 if os.path.exists("include/soc/oppo"):
@@ -284,8 +285,9 @@ empty_headers = [
     "drivers/oplus/oplus_gauge.h"
 ]
 for eh in empty_headers:
-    safe_write(eh, "#pragma once\n")
-    print(f"Created stub header: {eh}")
+    if not os.path.exists(eh):
+        safe_write(eh, "#pragma once\n")
+        print(f"Created stub header: {eh}")
 
 # 9.4 Create kernel/oplus_project_stub.c and register in kernel/Makefile
 stub_c_content = """// SPDX-License-Identifier: GPL-2.0
@@ -624,9 +626,17 @@ if os.path.exists("drivers/staging/android/ion/ion_system_heap.c"):
 sys_dir = "include/soc/oplus/system"
 os.makedirs(sys_dir, exist_ok=True)
 
+def write_stub_if_missing(filepath, content):
+    if not os.path.exists(filepath):
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"Created stub: {filepath}")
+    else:
+        print(f"Preserved existing OEM header: {filepath}")
+
 # 24.1 kernel_fb.h
-with open(os.path.join(sys_dir, "kernel_fb.h"), "w", encoding="utf-8") as f:
-    f.write("""#ifndef _KERNEL_FB_H_
+write_stub_if_missing(os.path.join(sys_dir, "kernel_fb.h"), """#ifndef _KERNEL_FB_H_
 #define _KERNEL_FB_H_
 #define FB_SENSOR 0
 #define FB_SENSOR_ID_CRASH 0
@@ -636,8 +646,7 @@ static inline int oplus_kevent_fb_str(int fb_type, int id, const char *reason) {
 """)
 
 # 24.2 oplus_mm_kevent_fb.h
-with open(os.path.join(sys_dir, "oplus_mm_kevent_fb.h"), "w", encoding="utf-8") as f:
-    f.write("""#ifndef _OPLUS_MM_KEVENT_FB_H_
+write_stub_if_missing(os.path.join(sys_dir, "oplus_mm_kevent_fb.h"), """#ifndef _OPLUS_MM_KEVENT_FB_H_
 #define _OPLUS_MM_KEVENT_FB_H_
 #define OPLUS_AUDIO_EVENTID_ADSP_CRASH 0
 #define MM_FB_KEY_RATELIMIT_5MIN 0
@@ -659,8 +668,7 @@ if os.path.exists("include/soc/oppo/oppo_project.h"):
         f.write(opc)
     print("Injected linux/types.h and oplus_daily_build alias to include/soc/oppo/oppo_project.h")
 
-with open(os.path.join(sys_dir, "boot_mode.h"), "w", encoding="utf-8") as f:
-    f.write("""#ifndef _SOC_OPLUS_BOOT_MODE_H_
+write_stub_if_missing(os.path.join(sys_dir, "boot_mode.h"), """#ifndef _SOC_OPLUS_BOOT_MODE_H_
 #define _SOC_OPLUS_BOOT_MODE_H_
 #include <linux/types.h>
 #if __has_include(<soc/oppo/boot_mode.h>)
@@ -669,8 +677,7 @@ with open(os.path.join(sys_dir, "boot_mode.h"), "w", encoding="utf-8") as f:
 #endif
 """)
 
-with open(os.path.join(sys_dir, "oppo_project.h"), "w", encoding="utf-8") as f:
-    f.write("""#ifndef _SOC_OPLUS_OPPO_PROJECT_H_
+write_stub_if_missing(os.path.join(sys_dir, "oppo_project.h"), """#ifndef _SOC_OPLUS_OPPO_PROJECT_H_
 #define _SOC_OPLUS_OPPO_PROJECT_H_
 #include <linux/types.h>
 #if __has_include(<soc/oppo/oppo_project.h>)
@@ -682,8 +689,7 @@ with open(os.path.join(sys_dir, "oppo_project.h"), "w", encoding="utf-8") as f:
 #endif
 """)
 
-with open(os.path.join(sys_dir, "oplus_project.h"), "w", encoding="utf-8") as f:
-    f.write("""#ifndef _SOC_OPLUS_OPLUS_PROJECT_H_
+write_stub_if_missing(os.path.join(sys_dir, "oplus_project.h"), """#ifndef _SOC_OPLUS_OPLUS_PROJECT_H_
 #define _SOC_OPLUS_OPLUS_PROJECT_H_
 #include <linux/types.h>
 #if __has_include(<soc/oppo/oppo_project.h>)
@@ -711,8 +717,8 @@ other_stubs = [
 
 for hname, body in other_stubs:
     guard = "_" + hname.upper().replace(".", "_") + "_"
-    with open(os.path.join(sys_dir, hname), "w", encoding="utf-8") as f:
-        f.write(f"#ifndef {guard}\n#define {guard}\n{body}\n#endif\n")
+    target_path = os.path.join(sys_dir, hname)
+    write_stub_if_missing(target_path, f"#ifndef {guard}\n#define {guard}\n{body}\n#endif\n")
 
 print("Created all OEM stubs in include/soc/oplus/system/")
 
