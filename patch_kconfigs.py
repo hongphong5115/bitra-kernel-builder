@@ -165,24 +165,8 @@ for root, dirs, files in os.walk("."):
 
 print(f"Universal Makefile scanner completed. Total missing OEM targets fixed: {mf_fixed_count}")
 
-# 7. Comment out any missing healthinfo includes across the tree
-hi_count = 0
-for root, dirs, files in os.walk("."):
-    for f in files:
-        if f.endswith(".c") or f.endswith(".h"):
-            c_path = os.path.join(root, f)
-            try:
-                with open(c_path, "r", encoding="utf-8", errors="ignore") as cf:
-                    ccontent = cf.read()
-                if "linux/healthinfo/" in ccontent:
-                    ccontent = re.sub(r'#include\s*<linux/healthinfo/[^>]+>', '// [DISABLED MISSING OEM HEADER]', ccontent)
-                    with open(c_path, "w", encoding="utf-8") as cf:
-                        cf.write(ccontent)
-                    print(f"Disabled missing healthinfo include in {c_path}")
-                    hi_count += 1
-            except Exception:
-                pass
-print(f"Disabled missing healthinfo includes: {hi_count}")
+# 7. Preserve healthinfo includes
+print("Preserved healthinfo includes intact")
 
 # 8. Fix Realme broken syntax in fs/pstore/ram.c
 if os.path.exists("fs/pstore/ram.c"):
@@ -1299,6 +1283,39 @@ if os.path.exists(aw_h_path):
         with open(aw_h_path, "w", encoding="utf-8") as f:
             f.write(awhc)
     print("Injected OPLUS_FEATURE_CHG_BASIC into aw8697.h")
+
+# 56. Provide safe fallbacks in healthinfo headers
+ion_h_path = "include/linux/healthinfo/ion.h"
+if os.path.exists(ion_h_path):
+    with open(ion_h_path, "r", encoding="utf-8", errors="ignore") as f:
+        ihc = f.read()
+    if "static inline unsigned long ion_total" not in ihc:
+        ihc = re.sub(
+            r'extern\s+unsigned\s+long\s+ion_total\s*\(\s*void\s*\)\s*;',
+            'static inline unsigned long ion_total(void) { extern atomic_long_t ion_total_size; return (unsigned long)atomic_long_read(&ion_total_size); }',
+            ihc
+        )
+        with open(ion_h_path, "w", encoding="utf-8") as f:
+            f.write(ihc)
+        print("Provided static inline fallback for ion_total in ion.h")
+
+mem_mon_path = "include/linux/healthinfo/memory_monitor.h"
+if os.path.exists(mem_mon_path):
+    with open(mem_mon_path, "r", encoding="utf-8", errors="ignore") as f:
+        mmhc = f.read()
+    if "__attribute__((weak))" not in mmhc:
+        mmhc = mmhc.replace(
+            "extern void memory_alloc_monitor(gfp_t gfp_mask, unsigned int order, u64 wait_ms);",
+            "void __attribute__((weak)) memory_alloc_monitor(gfp_t gfp_mask, unsigned int order, u64 wait_ms) {}"
+        )
+        mmhc = mmhc.replace(
+            "extern void ionwait_monitor(u64 wait_ms);",
+            "void __attribute__((weak)) ionwait_monitor(u64 wait_ms) {}"
+        )
+        with open(mem_mon_path, "w", encoding="utf-8") as f:
+            f.write(mmhc)
+        print("Provided weak stubs for memory_alloc_monitor in memory_monitor.h")
+
 
 
 
