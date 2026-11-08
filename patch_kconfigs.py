@@ -1221,6 +1221,58 @@ if os.path.exists(dsi_phy_path):
         f.write(dpc)
     print("Guarded get_main_display in dsi_phy_hw_v4_0.c")
 
+# 52. Fix fw_download_interface.c & fw_download_interface.h
+fw_h_path = "techpack/camera/drivers/cam_sensor_module/oplus/cam_ois/onsemi_fw/fw_download_interface.h"
+if os.path.exists(fw_h_path):
+    with open(fw_h_path, "r", encoding="utf-8", errors="ignore") as f:
+        fwhc = f.read()
+    fwhc = fwhc.replace(
+        "void forceExitpoll(struct cam_ois_ctrl_t *o_ctrl);\nvoid WriteEEpromData(struct cam_write_eeprom_t *cam_write_eeprom);",
+        "void forceExitpoll(struct cam_ois_ctrl_t *o_ctrl);\nstruct cam_write_eeprom_t;\nvoid WriteEEpromData(struct cam_write_eeprom_t *cam_write_eeprom);"
+    )
+    with open(fw_h_path, "w", encoding="utf-8") as f:
+        f.write(fwhc)
+    print("Fixed forward declaration in fw_download_interface.h")
+
+fw_c_path = "techpack/camera/drivers/cam_sensor_module/oplus/cam_ois/onsemi_fw/fw_download_interface.c"
+if os.path.exists(fw_c_path):
+    with open(fw_c_path, "r", encoding="utf-8", errors="ignore") as f:
+        fwcc = f.read()
+    fwcc = re.sub(
+        r'void WriteEEpromData\(struct cam_write_eeprom_t \*cam_write_eeprom\)[\s\S]*?^}',
+        'void WriteEEpromData(struct cam_write_eeprom_t *cam_write_eeprom) { (void)cam_write_eeprom; }',
+        fwcc,
+        flags=re.MULTILINE
+    )
+    fwcc = re.sub(
+        r'void ReadEEpromData\(struct cam_write_eeprom_t \*cam_write_eeprom\)[\s\S]*?^}',
+        'void ReadEEpromData(struct cam_write_eeprom_t *cam_write_eeprom) { (void)cam_write_eeprom; }',
+        fwcc,
+        flags=re.MULTILINE
+    )
+    with open(fw_c_path, "w", encoding="utf-8") as f:
+        f.write(fwcc)
+    print("Stubbed WriteEEpromData and ReadEEpromData in fw_download_interface.c")
+
+# 53. Fix dsi_display.c DSI_CMD_SET_REGISTER_READ
+dsi_c_path = "techpack/display/msm/dsi/dsi_display.c"
+if os.path.exists(dsi_c_path):
+    with open(dsi_c_path, "r", encoding="utf-8", errors="ignore") as f:
+        dsic = f.read()
+    dsic = dsic.replace(
+        "int dsi_display_register_read(struct dsi_display *dsi_display, unsigned char registers, char *buf, size_t count)\n{",
+        "int dsi_display_register_read(struct dsi_display *dsi_display, unsigned char registers, char *buf, size_t count)\n{\n#ifndef DSI_CMD_SET_REGISTER_READ\n\treturn -ENODEV;\n#else"
+    )
+    # Add #endif before the closing brace of dsi_display_register_read
+    dsic = dsic.replace(
+        "if (rc <= 0)\n\t\tDSI_ERR(\"rx cmd transfer failed rc=%d\\n\", rc);\n\n\treturn rc;\n}",
+        "if (rc <= 0)\n\t\tDSI_ERR(\"rx cmd transfer failed rc=%d\\n\", rc);\n\n\treturn rc;\n#endif\n}"
+    )
+    with open(dsi_c_path, "w", encoding="utf-8") as f:
+        f.write(dsic)
+    print("Guarded dsi_display_register_read in dsi_display.c")
+
+
 
 
 
