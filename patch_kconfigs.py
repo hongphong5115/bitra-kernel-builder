@@ -803,16 +803,11 @@ if os.path.exists("kernel/panic_flush.c"):
         f.write(pfc)
     print("Defined is_fulldump_enable in kernel/panic_flush.c")
 
-# 32. Fix drivers/power/supply/qcom/Makefile schgm-flash.o without smb5-lib
-if os.path.exists("drivers/power/supply/qcom/Makefile"):
-    with open("drivers/power/supply/qcom/Makefile", "r", encoding="utf-8", errors="ignore") as f:
-        pmk = f.read()
-    pmk = pmk.replace("schgm-flash.o", "")
-    with open("drivers/power/supply/qcom/Makefile", "w", encoding="utf-8") as f:
-        f.write(pmk)
-    print("Removed schgm-flash.o from drivers/power/supply/qcom/Makefile")
+# 32. Fix drivers/power/supply/qcom/Makefile schgm-flash.o (KEEP schgm-flash.o for oplus_battery_msm8250.c)
+# Skipped removal of schgm-flash.o so is_flash_active, schgm_flash_init, etc. are available
+print("Preserved schgm-flash.o in drivers/power/supply/qcom/Makefile")
 
-# 33. Disable CONFIG_OPLUS_HANS & stub hans_check_frozen_transcation
+# 33. Disable CONFIG_OPLUS_HANS & stub hans_check_frozen_transcation and hans_report
 for defcfg in ["arch/arm64/configs/vendor/kona-perf_defconfig", "arch/arm64/configs/vendor/kona_defconfig"]:
     if os.path.exists(defcfg):
         with open(defcfg, "r", encoding="utf-8", errors="ignore") as f:
@@ -835,6 +830,15 @@ if os.path.exists("drivers/staging/android/hans.c"):
         hc += "\nint hans_check_frozen_transcation(void *t, void *p) { return 0; }\n"
         with open("drivers/staging/android/hans.c", "w", encoding="utf-8") as f:
             f.write(hc)
+
+if os.path.exists("kernel/signal.c"):
+    with open("kernel/signal.c", "r", encoding="utf-8", errors="ignore") as f:
+        sc = f.read()
+    if "int hans_report" not in sc:
+        sc += "\n#ifdef OPLUS_FEATURE_HANS_FREEZE\n#include <linux/hans.h>\nint __attribute__((weak)) hans_report(enum message_type type, int caller_pid, int caller_uid, int target_pid, int target_uid, const char *rpc_name, int code) { return 0; }\nEXPORT_SYMBOL(hans_report);\nvoid __attribute__((weak)) hans_check_frozen_transcation(uid_t uid, enum message_type type) {}\nEXPORT_SYMBOL(hans_check_frozen_transcation);\n#endif\n"
+        with open("kernel/signal.c", "w", encoding="utf-8") as f:
+            f.write(sc)
+    print("Injected hans_report and hans_check_frozen_transcation stubs into kernel/signal.c")
 
 # 34. Fix include/linux/msm_drm_notify.h msm_drm_register_client (NOT NEEDED, techpack/display defines real functions)
 # Skipped
@@ -1253,16 +1257,22 @@ if os.path.exists(mem_mon_path):
             f.write(mmhc)
         print("Provided weak stubs for memory_alloc_monitor in memory_monitor.h")
 
-# 57. Guard fg.h against macro collisions
+# 57. Guard fg.h against macro collisions and stub is_fg
 fg_h_path = "include/linux/healthinfo/fg.h"
 if os.path.exists(fg_h_path):
     with open(fg_h_path, "r", encoding="utf-8", errors="ignore") as f:
         fghc = f.read()
     if "#undef current_is_fg" not in fghc:
         fghc = "#ifdef current_is_fg\n#undef current_is_fg\n#endif\n" + fghc
-        with open(fg_h_path, "w", encoding="utf-8") as f:
-            f.write(fghc)
-        print("Guarded current_is_fg in fg.h")
+    fghc = fghc.replace("#ifdef CONFIG_FG_TASK_UID", "#if 0 // inlined is_fg=false")
+    with open(fg_h_path, "w", encoding="utf-8") as f:
+        f.write(fghc)
+    print("Guarded current_is_fg and inlined is_fg in fg.h")
+
+for defcfg in ["arch/arm64/configs/vendor/kona-perf_defconfig", "arch/arm64/configs/vendor/kona_defconfig"]:
+    if os.path.exists(defcfg):
+        with open(defcfg, "a", encoding="utf-8") as f:
+            f.write("\nCONFIG_FG_TASK_UID=n\n")
 
 # 58. Fix msm_drm_notify.h declarations for msm_atomic.c
 drm_n_path = "include/linux/msm_drm_notify.h"
