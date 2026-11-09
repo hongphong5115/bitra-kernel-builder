@@ -143,8 +143,6 @@ jobs:
         echo "CONFIG_PHYSICAL_ANTI_FRAGMENTATION=n" >> arch/arm64/configs/$DEFCONFIG
         sed -i '/CONFIG_OPLUS_FEATURE_UXIO_FIRST/d' arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_OPLUS_FEATURE_UXIO_FIRST=n" >> arch/arm64/configs/$DEFCONFIG
-        sed -i '/CONFIG_FG_TASK_UID/d' arch/arm64/configs/$DEFCONFIG
-        echo "CONFIG_FG_TASK_UID=n" >> arch/arm64/configs/$DEFCONFIG
         sed -i '/CONFIG_OPLUS_HANS/d' arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_OPLUS_HANS=n" >> arch/arm64/configs/$DEFCONFIG
         sed -i '/CONFIG_KSU_MANUAL_HOOK/d' arch/arm64/configs/$DEFCONFIG

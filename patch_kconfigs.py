@@ -836,9 +836,11 @@ if os.path.exists("kernel/signal.c"):
         sc = f.read()
     if "int hans_report" not in sc:
         sc += "\n#ifdef OPLUS_FEATURE_HANS_FREEZE\n#include <linux/hans.h>\nint __attribute__((weak)) hans_report(enum message_type type, int caller_pid, int caller_uid, int target_pid, int target_uid, const char *rpc_name, int code) { return 0; }\nEXPORT_SYMBOL(hans_report);\nvoid __attribute__((weak)) hans_check_frozen_transcation(uid_t uid, enum message_type type) {}\nEXPORT_SYMBOL(hans_check_frozen_transcation);\n#endif\n"
-        with open("kernel/signal.c", "w", encoding="utf-8") as f:
-            f.write(sc)
-    print("Injected hans_report and hans_check_frozen_transcation stubs into kernel/signal.c")
+    if "bool is_fg" not in sc:
+        sc += "\nbool __attribute__((weak)) is_fg(int uid) { return false; }\nEXPORT_SYMBOL(is_fg);\n"
+    with open("kernel/signal.c", "w", encoding="utf-8") as f:
+        f.write(sc)
+    print("Injected hans and is_fg stubs into kernel/signal.c")
 
 # 34. Fix include/linux/msm_drm_notify.h msm_drm_register_client (NOT NEEDED, techpack/display defines real functions)
 # Skipped
@@ -1264,15 +1266,15 @@ if os.path.exists(fg_h_path):
         fghc = f.read()
     if "#undef current_is_fg" not in fghc:
         fghc = "#ifdef current_is_fg\n#undef current_is_fg\n#endif\n" + fghc
-    fghc = fghc.replace("#ifdef CONFIG_FG_TASK_UID", "#if 0 // inlined is_fg=false")
+    fghc = re.sub(
+        r'static\s+inline\s+bool\s+is_fg\s*\([^)]*\)\s*\{.*?\}',
+        'extern bool is_fg(int uid);',
+        fghc,
+        flags=re.DOTALL
+    )
     with open(fg_h_path, "w", encoding="utf-8") as f:
         f.write(fghc)
-    print("Guarded current_is_fg and inlined is_fg in fg.h")
-
-for defcfg in ["arch/arm64/configs/vendor/kona-perf_defconfig", "arch/arm64/configs/vendor/kona_defconfig"]:
-    if os.path.exists(defcfg):
-        with open(defcfg, "a", encoding="utf-8") as f:
-            f.write("\nCONFIG_FG_TASK_UID=n\n")
+    print("Guarded current_is_fg and replaced static inline is_fg with extern declaration in fg.h")
 
 # 58. Fix msm_drm_notify.h declarations for msm_atomic.c
 drm_n_path = "include/linux/msm_drm_notify.h"
