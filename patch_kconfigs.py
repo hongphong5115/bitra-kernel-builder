@@ -46,12 +46,7 @@ for root, dirs, files in os.walk(".", followlinks=False):
                         dangling_symlinks += 1
                     except Exception:
                         pass
-        elif name in ["sched_assist", "tuning"] and ("kernel" in root):
-            try:
-                shutil.rmtree(p, ignore_errors=True)
-                dangling_symlinks += 1
-            except Exception:
-                pass
+        # Keep real directories intact (sched_assist, tuning)
 print(f"Universal dangling symlink cleaner completed. Total removed: {dangling_symlinks}")
 
 # 5. Universal Kconfig scanner
@@ -860,7 +855,7 @@ if os.path.exists("fs/proc/Makefile"):
     with open("fs/proc/Makefile", "r", encoding="utf-8", errors="ignore") as f:
         pmf = f.read()
     pmf = re.sub(r'obj-y\s*\+=\s*healthinfo\/', '# obj-y += healthinfo/', pmf)
-    pmf = re.sub(r'obj-y\s*\+=\s*task_cpustats\/', '# obj-y += task_cpustats/', pmf)
+    # Keep task_cpustats/ active (provides sysctl_task_cpustats_enable, task_sched_info)
     with open("fs/proc/Makefile", "w", encoding="utf-8") as f:
         f.write(pmf)
     print("Neutralized healthinfo in fs/proc/Makefile")
@@ -890,14 +885,8 @@ if os.path.exists("mm/Makefile"):
         f.write(mmf)
     print("Neutralized healthinfo, task_mem, reserve_area, multi_freearea, and switched to process_mm_reclaim_weak in mm/Makefile")
 
-# 39. Neutralize special_opt in kernel/Makefile
-if os.path.exists("kernel/Makefile"):
-    with open("kernel/Makefile", "r", encoding="utf-8", errors="ignore") as f:
-        kmf = f.read()
-    kmf = re.sub(r'obj-y\s*\+=\s*special_opt\/', '# obj-y += special_opt/', kmf)
-    with open("kernel/Makefile", "w", encoding="utf-8") as f:
-        f.write(kmf)
-    print("Neutralized special_opt in kernel/Makefile")
+# 39. Keep special_opt in kernel/Makefile (provides is_heavy_load_task, ux_init_cpu_data)
+# Skipped
 
 # 40. Neutralize uxio_first in block/Makefile
 if os.path.exists("block/Makefile"):
