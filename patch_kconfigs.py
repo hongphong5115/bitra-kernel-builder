@@ -584,9 +584,6 @@ if os.path.exists("drivers/staging/android/ion/ion_system_heap.c"):
     with open("drivers/staging/android/ion/ion_system_heap.c", "r", encoding="utf-8", errors="ignore") as f:
         ic = f.read()
     ic = re.sub(r'#ifdef\s+CONFIG_OPLUS_ION_BOOSTPOOL', '#if 0 /* DISABLED CONFIG_OPLUS_ION_BOOSTPOOL */', ic)
-    # Define fallback for NR_IONCACHE_PAGES (when OPLUS_FEATURE_HEALTHINFO is disabled)
-    if "NR_IONCACHE_PAGES" in ic and "#define NR_IONCACHE_PAGES" not in ic:
-        ic = "#ifndef NR_IONCACHE_PAGES\n#define NR_IONCACHE_PAGES NR_FREE_PAGES\n#endif\n" + ic
     # Stub fill_pool_kworkthread to return 0 immediately instead of while-looping
     if "static int fill_pool_kworkthread(void *p)" in ic:
         ic = ic.replace(
@@ -1326,6 +1323,17 @@ if os.path.exists(fg_h_path):
         with open(fg_h_path, "w", encoding="utf-8") as f:
             f.write(fghc)
         print("Guarded current_is_fg in fg.h")
+
+# 58. Fix msm_drm_notify.h declarations for msm_atomic.c
+drm_n_path = "include/linux/msm_drm_notify.h"
+if os.path.exists(drm_n_path):
+    with open(drm_n_path, "r", encoding="utf-8", errors="ignore") as f:
+        dnc = f.read()
+    dnc = dnc.replace("#ifdef CONFIG_DRM_MSM", "#if 1 // CONFIG_DRM_MSM")
+    with open(drm_n_path, "w", encoding="utf-8") as f:
+        f.write(dnc)
+    print("Forced extern declarations in msm_drm_notify.h")
+
 
 
 
