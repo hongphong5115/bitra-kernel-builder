@@ -157,6 +157,13 @@ jobs:
         MAKE_FLAGS="ARCH=arm64 AR=llvm-ar CC=clang NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip LLVM=1 O=out"
         
         make $MAKE_FLAGS $DEFCONFIG
+        
+        # Pre-create all driver output subdirectories in out/ to ensure out-of-tree builds don't fail
+        mkdir -p out/drivers/kernelsu/core out/drivers/kernelsu/compat out/drivers/kernelsu/feature \
+                 out/drivers/kernelsu/hook out/drivers/kernelsu/infra out/drivers/kernelsu/manager \
+                 out/drivers/kernelsu/policy out/drivers/kernelsu/runtime out/drivers/kernelsu/selinux \
+                 out/drivers/kernelsu/sulog out/drivers/kernelsu/supercall out/drivers/kernelsu/preinit
+        
         make $MAKE_FLAGS -j$(nproc --all) Image dtbs
 
     - name: Package AnyKernel3

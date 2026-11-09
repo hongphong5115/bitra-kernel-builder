@@ -83,6 +83,11 @@ if os.path.exists(kbuild_p):
     with open(kbuild_p, "r", encoding="utf-8", errors="ignore") as fp:
         kc = fp.read()
     
+    # Prepend mkdir for all subdirectories in $(obj) so out-of-tree builds (O=out) never fail with missing directory error
+    mkdir_rule = "$(shell mkdir -p $(addprefix $(obj)/, core compat feature hook infra manager policy runtime selinux sulog supercall preinit))\n"
+    if "mkdir -p $(addprefix $(obj)" not in kc:
+        kc = mkdir_rule + kc
+
     # Force HAVE_KSU_HOOK := 0 so it never errors out on hook verification
     kc = re.sub(r'HAVE_KSU_HOOK\s*\?=\s*1', 'HAVE_KSU_HOOK := 0', kc)
     kc = re.sub(r'ifneq\s*\(\$\(HAVE_KSU_HOOK\),0\).*?endif', '# Hook check bypassed for Kprobes', kc, flags=re.DOTALL)
@@ -101,6 +106,6 @@ kernelsu-y := $(kernelsu-objs)
     
     with open(kbuild_p, "w", encoding="utf-8") as fp:
         fp.write(kc)
-    print("Patched drivers/kernelsu/Kbuild with HAVE_KSU_HOOK=0 and composite kernelsu_core.o link rule")
+    print("Patched drivers/kernelsu/Kbuild with mkdir, HAVE_KSU_HOOK=0 and composite kernelsu_core.o link rule")
 
 print("=== KernelSU-Next Patch Complete ===")
