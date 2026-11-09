@@ -851,18 +851,8 @@ if os.path.exists("drivers/staging/android/hans.c"):
         with open("drivers/staging/android/hans.c", "w", encoding="utf-8") as f:
             f.write(hc)
 
-# 34. Fix include/linux/msm_drm_notify.h msm_drm_register_client
-if os.path.exists("include/linux/msm_drm_notify.h"):
-    with open("include/linux/msm_drm_notify.h", "r", encoding="utf-8", errors="ignore") as f:
-        dhc = f.read()
-    dhc = re.sub(
-        r"#ifdef\s+CONFIG_DRM_MSM[\s\S]*?#endif",
-        "static inline int msm_drm_register_client(struct notifier_block *nb) { return 0; }\nstatic inline int msm_drm_unregister_client(struct notifier_block *nb) { return 0; }",
-        dhc
-    )
-    with open("include/linux/msm_drm_notify.h", "w", encoding="utf-8") as f:
-        f.write(dhc)
-    print("Inlined msm_drm_register_client in include/linux/msm_drm_notify.h")
+# 34. Fix include/linux/msm_drm_notify.h msm_drm_register_client (NOT NEEDED, techpack/display defines real functions)
+# Skipped
 
 # 35. Fix mm/vmscan.c kswapd_threads & drivers/soc/qcom/watchdog_v2.c cpu_idle_pc_state
 if os.path.exists("mm/vmscan.c"):
