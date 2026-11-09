@@ -44,15 +44,7 @@ jobs:
         # 2. Integrate KernelSU-Next (native SuSFS support)
         echo "Integrating KernelSU-Next..."
         curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/legacy/kernel/setup.sh" | bash -s legacy
-        python3 -c "import os; [open(os.path.join(r, f), 'w').write(open(os.path.join(r, f), 'r', errors='ignore').read().replace('<linux/pgtable.h>', '<asm/pgtable.h>')) for r, d, fs in os.walk('drivers/kernelsu') for f in fs if f.endswith(('.c', '.h')) and '<linux/pgtable.h>' in open(os.path.join(r, f), 'r', errors='ignore').read()]"
-        python3 -c "import os; [open(os.path.join(r, f), 'w').write('#include <linux/version.h>\n#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)\n#define copy_to_kernel_nofault probe_kernel_write\n#endif\n' + open(os.path.join(r, f), 'r', errors='ignore').read()) for r, d, fs in os.walk('drivers/kernelsu') for f in fs if f.endswith(('.c', '.h')) and 'copy_to_kernel_nofault' in open(os.path.join(r, f), 'r', errors='ignore').read()]"
-        python3 -c "import os; [open(os.path.join(r, f), 'w').write(open(os.path.join(r, f), 'r', errors='ignore').read().replace('LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 222)', 'LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0)')) for r, d, fs in os.walk('drivers/kernelsu') for f in fs if f.endswith(('.c', '.h')) and 'KERNEL_VERSION(4, 14, 222)' in open(os.path.join(r, f), 'r', errors='ignore').read()]"
-        python3 -c "import os; p='drivers/kernelsu/compat/kernel_compat.c'; open(p,'w').write('#include <linux/version.h>\n#include <linux/mm.h>\n#include <linux/slab.h>\n#include <linux/vmalloc.h>\n#include <linux/uaccess.h>\n#ifndef ksu_access_ok\n#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)\n#define ksu_access_ok(addr, size) access_ok(addr, size)\n#else\n#define ksu_access_ok(addr, size) access_ok(VERIFY_READ, addr, size)\n#endif\n#endif\n' + open(p,'r',errors='ignore').read()) if os.path.exists(p) else None"
-        python3 -c "import os; [open(os.path.join(r, f), 'w').write('#include <linux/version.h>\n#ifndef TWA_RESUME\n#define TWA_RESUME true\n#endif\n#ifndef TWA_NONE\n#define TWA_NONE false\n#endif\n#ifndef TWA_SIGNAL\n#define TWA_SIGNAL true\n#endif\n' + open(os.path.join(r, f), 'r', errors='ignore').read()) for r, d, fs in os.walk('drivers/kernelsu') for f in fs if f.endswith(('.c', '.h')) and ('TWA_RESUME' in open(os.path.join(r, f), 'r', errors='ignore').read() or 'task_work_add' in open(os.path.join(r, f), 'r', errors='ignore').read())]"
-        python3 -c "import os; [open(os.path.join(r, f), 'w').write('long strncpy_from_user_nofault(char *dst, const void __user *unsafe_addr, long count);\n' + open(os.path.join(r, f), 'r', errors='ignore').read()) for r, d, fs in os.walk('drivers/kernelsu') for f in fs if f.endswith(('.c', '.h')) and 'strncpy_from_user_nofault' in open(os.path.join(r, f), 'r', errors='ignore').read() and 'long strncpy_from_user_nofault' not in open(os.path.join(r, f), 'r', errors='ignore').read()]"
-        
-        # Link all KernelSU objects into a single composite ELF object so all symbols resolve cleanly on 4.19 kbuild
-        python3 -c "p='drivers/kernelsu/Kbuild'; c=open(p).read().replace('obj-\$(CONFIG_KSU) += kernelsu.o', 'cmd_ksu_ld = \$(LD) \$(ld_flags) -r -o \$@ \$(filter-out FORCE,\$^)\n\$(obj)/kernelsu_core.o: \$(addprefix \$(obj)/,\$(kernelsu-objs)) FORCE\n\t\$(call if_changed,ksu_ld)\ntargets += \$(obj)/kernelsu_core.o\nobj-\$(CONFIG_KSU) := kernelsu_core.o'); open(p,'w').write(c)"
+        python3 ../patch_kernelsu.py
         
         # 3. Apply NoMount built-in driver
         echo "Applying NoMount integration..."
@@ -90,6 +82,12 @@ jobs:
         
         # --- KernelSU-Next & SuSFS ---
         echo "CONFIG_KSU=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KPROBES=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_HAVE_KPROBES=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KRETPROBES=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_HAVE_SYSCALL_TRACEPOINTS=y" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_MANUAL_HOOK=n" >> arch/arm64/configs/$DEFCONFIG
+        echo "CONFIG_KSU_KPROBES_HOOK=y" >> arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/$DEFCONFIG
@@ -145,8 +143,6 @@ jobs:
         echo "CONFIG_OPLUS_FEATURE_UXIO_FIRST=n" >> arch/arm64/configs/$DEFCONFIG
         sed -i '/CONFIG_OPLUS_HANS/d' arch/arm64/configs/$DEFCONFIG
         echo "CONFIG_OPLUS_HANS=n" >> arch/arm64/configs/$DEFCONFIG
-        sed -i '/CONFIG_KSU_MANUAL_HOOK/d' arch/arm64/configs/$DEFCONFIG
-        echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/$DEFCONFIG
 
     - name: Compile Ultimate Kernel
       run: |
