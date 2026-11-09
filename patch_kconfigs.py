@@ -960,16 +960,16 @@ if os.path.exists("block/Makefile"):
         f.write(bmf)
     print("Neutralized uxio_first in block/Makefile")
 
-# 41. Fix current_is_fg in drivers/block/zram/hybridswap/hybridswap_eswap.c
+# 41. Fix zsmalloc and healthinfo in drivers/block/zram/hybridswap/hybridswap_eswap.c
 hs_path = "drivers/block/zram/hybridswap/hybridswap_eswap.c"
 if os.path.exists(hs_path):
     with open(hs_path, "r", encoding="utf-8", errors="ignore") as f:
         hec = f.read()
-    if "current_is_fg" in hec and "static inline int current_is_fg" not in hec:
-        hec = "#define current_is_fg() (0)\n" + hec
+    if "<linux/zsmalloc.h>" not in hec:
+        hec = "#include <linux/zsmalloc.h>\n#include <linux/healthinfo/fg.h>\n" + hec
         with open(hs_path, "w", encoding="utf-8") as f:
             f.write(hec)
-        print("Injected current_is_fg fallback in hybridswap_eswap.c")
+        print("Injected zsmalloc and fg.h headers in hybridswap_eswap.c")
 
 # 42. Fix unused variable ret2 in techpack/audio/asoc/codecs/ak4376/ak4376.c
 ak_path = "techpack/audio/asoc/codecs/ak4376/ak4376.c"
@@ -1315,6 +1315,18 @@ if os.path.exists(mem_mon_path):
         with open(mem_mon_path, "w", encoding="utf-8") as f:
             f.write(mmhc)
         print("Provided weak stubs for memory_alloc_monitor in memory_monitor.h")
+
+# 57. Guard fg.h against macro collisions
+fg_h_path = "include/linux/healthinfo/fg.h"
+if os.path.exists(fg_h_path):
+    with open(fg_h_path, "r", encoding="utf-8", errors="ignore") as f:
+        fghc = f.read()
+    if "#undef current_is_fg" not in fghc:
+        fghc = "#ifdef current_is_fg\n#undef current_is_fg\n#endif\n" + fghc
+        with open(fg_h_path, "w", encoding="utf-8") as f:
+            f.write(fghc)
+        print("Guarded current_is_fg in fg.h")
+
 
 
 
