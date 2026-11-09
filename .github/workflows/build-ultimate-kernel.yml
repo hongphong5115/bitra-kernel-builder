@@ -22,12 +22,18 @@ jobs:
           bc bison build-essential ca-certificates ccache clang curl flex git \
           gnupg libelf-dev libssl-dev libtinfo5 libncurses5 lz4 make python3 python-is-python3 unzip zip wget
 
-    - name: Download ZyCromerZ Clang 10.0.1
+    - name: Download Clang 10 Toolchain
       run: |
-        mkdir -p clang-10
-        wget -c https://github.com/ZyCromerZ/Clang/releases/download/10.0.1-20220724-release/Clang-10.0.1-20220724.tar.gz
-        tar -xzf Clang-10.0.1-20220724.tar.gz -C clang-10
-        rm -f Clang-10.0.1-20220724.tar.gz
+        echo "Obtaining Clang 10..."
+        if curl -LSs --connect-timeout 10 --max-time 30 "https://github.com/ZyCromerZ/Clang/releases/download/10.0.1-20220724-release/Clang-10.0.1-20220724.tar.gz" -o clang.tar.gz && [ -s clang.tar.gz ]; then
+          mkdir -p clang-10
+          tar -xf clang.tar.gz -C clang-10
+          rm -f clang.tar.gz
+        else
+          echo "ZyCromerZ download timed out, cloning AOSP Clang 10 (clang-r383902)..."
+          rm -f clang.tar.gz
+          git clone --depth=1 https://github.com/AOSP-10/prebuilts_clang_host_linux-x86_clang-r383902 clang-10
+        fi
 
     - name: Clone Realme GT Neo 2 (rui4.0) Kernel Source
       run: |
