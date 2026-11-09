@@ -288,6 +288,9 @@ EXPORT_SYMBOL(oppo_daily_build);
 bool __attribute__((weak)) oplus_daily_build(void) { return false; }
 EXPORT_SYMBOL(oplus_daily_build);
 
+bool __attribute__((weak)) is_project(int project) { return (get_project() == (unsigned int)project); }
+EXPORT_SYMBOL(is_project);
+
 uint32_t __attribute__((weak)) get_oppo_feature(int index) { return 0; }
 EXPORT_SYMBOL(get_oppo_feature);
 """
@@ -1285,6 +1288,62 @@ if os.path.exists(drm_n_path):
     with open(drm_n_path, "w", encoding="utf-8") as f:
         f.write(dnc)
     print("Forced extern declarations in msm_drm_notify.h")
+
+# 59. Inject can_umount and path_umount into fs/namespace.c and fs/internal.h for KernelSU
+if os.path.exists("fs/namespace.c"):
+    with open("fs/namespace.c", "r", encoding="utf-8", errors="ignore") as f:
+        nc = f.read()
+    
+    can_umount_code = """
+static int can_umount(const struct path *path, int flags)
+{
+        struct mount *mnt = real_mount(path->mnt);
+        if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW))
+                return -EINVAL;
+        if (!may_mount())
+                return -EPERM;
+        if (path->dentry != path->mnt->mnt_root)
+                return -EINVAL;
+        if (!check_mnt(mnt))
+                return -EINVAL;
+        if (mnt->mnt.mnt_flags & MNT_LOCKED)
+                return -EINVAL;
+        if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
+                return -EPERM;
+        return 0;
+}
+"""
+    path_umount_code = """
+int path_umount(struct path *path, int flags)
+{
+        struct mount *mnt = real_mount(path->mnt);
+        int ret;
+        ret = can_umount(path, flags);
+        if (!ret)
+                ret = do_umount(mnt, flags);
+        dput(path->dentry);
+        mntput_no_expire(mnt);
+        return ret;
+}
+EXPORT_SYMBOL(path_umount);
+"""
+    if "can_umount(" not in nc:
+        nc += can_umount_code
+    if "int path_umount" not in nc:
+        nc += path_umount_code
+    with open("fs/namespace.c", "w", encoding="utf-8") as f:
+        f.write(nc)
+    print("Injected can_umount and path_umount into fs/namespace.c")
+
+if os.path.exists("fs/internal.h"):
+    with open("fs/internal.h", "r", encoding="utf-8", errors="ignore") as f:
+        ic = f.read()
+    if "int path_umount" not in ic:
+        ic += "\nint path_umount(struct path *path, int flags);\n"
+        with open("fs/internal.h", "w", encoding="utf-8") as f:
+            f.write(ic)
+        print("Injected path_umount declaration into fs/internal.h")
+
 
 
 
