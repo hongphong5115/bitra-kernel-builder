@@ -794,18 +794,8 @@ if os.path.exists("drivers/usb/pd/policy_engine.c"):
         f.write(pec)
     print("Fixed drivers/usb/pd/policy_engine.c pd_lobal declaration")
 
-# 30. Fix drivers/usb/pd/policy_engine.c missing oplus_wpc_set_wrx_en_value
-if os.path.exists("drivers/usb/pd/policy_engine.c"):
-    with open("drivers/usb/pd/policy_engine.c", "r", encoding="utf-8", errors="ignore") as f:
-        pec = f.read()
-    pec = re.sub(
-        r"extern\s+void\s+oplus_wpc_set_wrx_en_value\s*\([^)]*\)\s*;",
-        "void oplus_wpc_set_wrx_en_value(int value) {}\nEXPORT_SYMBOL(oplus_wpc_set_wrx_en_value);",
-        pec
-    )
-    with open("drivers/usb/pd/policy_engine.c", "w", encoding="utf-8") as f:
-        f.write(pec)
-    print("Replaced extern oplus_wpc_set_wrx_en_value with implementation in policy_engine.c")
+# 30. Fix drivers/usb/pd/policy_engine.c (Skipped: oplus_wireless.c provides real definition)
+# Skipped
 
 # 31. Fix kernel/panic_flush.c is_fulldump_enable
 if os.path.exists("kernel/panic_flush.c"):
@@ -854,18 +844,8 @@ if os.path.exists("drivers/staging/android/hans.c"):
 # 34. Fix include/linux/msm_drm_notify.h msm_drm_register_client (NOT NEEDED, techpack/display defines real functions)
 # Skipped
 
-# 35. Fix mm/vmscan.c kswapd_threads & drivers/soc/qcom/watchdog_v2.c cpu_idle_pc_state
-if os.path.exists("mm/vmscan.c"):
-    with open("mm/vmscan.c", "r", encoding="utf-8", errors="ignore") as f:
-        vmc = f.read()
-    vmc = re.sub(
-        r"#ifndef CONFIG_OPLUS_MULTI_KSWAPD[\s\S]*?#endif\s*\/\*CONFIG_OPLUS_MULTI_KSWAPD\*\/",
-        "#define DEF_KSWAPD_THREADS_PER_NODE 1\nint kswapd_threads = 1;\nint kswapd_threads_current = 1;",
-        vmc
-    )
-    with open("mm/vmscan.c", "w", encoding="utf-8") as f:
-        f.write(vmc)
-    print("Fixed mm/vmscan.c kswapd_threads and kswapd_threads_current declaration")
+# 35. Fix mm/vmscan.c (Skipped: multi_kswapd.c provides kswapd_threads) & drivers/soc/qcom/watchdog_v2.c cpu_idle_pc_state
+# mm/vmscan.c patch skipped to avoid duplicate symbol collision with multi_kswapd.o
 
 if os.path.exists("drivers/soc/qcom/watchdog_v2.c"):
     with open("drivers/soc/qcom/watchdog_v2.c", "r", encoding="utf-8", errors="ignore") as f:
@@ -893,27 +873,8 @@ for dc in [
         with open(dc, "a", encoding="utf-8") as f:
             f.write("\nCONFIG_OPLUS_HEALTHINFO=n\nCONFIG_OPLUS_JANK_INFO=n\nCONFIG_DUMP_TASKS_MEM=n\nCONFIG_PROCESS_RECLAIM_ENHANCE=n\nCONFIG_VIRTUAL_RESERVE_MEMORY=n\nCONFIG_PHYSICAL_ANTI_FRAGMENTATION=n\nCONFIG_OPLUS_FEATURE_UXIO_FIRST=n\n")
 
-# 37. Fix kswapd_unbind_cpu in kernel/sched/core.c and include/linux/swap.h
-if os.path.exists("kernel/sched/core.c"):
-    with open("kernel/sched/core.c", "r", encoding="utf-8", errors="ignore") as f:
-        scc = f.read()
-    if "int kswapd_unbind_cpu" not in scc:
-        scc = scc.replace(
-            "void upate_kswapd_unbind_cpu(void)",
-            "int kswapd_unbind_cpu = -1;\nEXPORT_SYMBOL(kswapd_unbind_cpu);\nvoid upate_kswapd_unbind_cpu(void)"
-        )
-        with open("kernel/sched/core.c", "w", encoding="utf-8") as f:
-            f.write(scc)
-        print("Injected kswapd_unbind_cpu into kernel/sched/core.c")
-
-if os.path.exists("include/linux/swap.h"):
-    with open("include/linux/swap.h", "r", encoding="utf-8", errors="ignore") as f:
-        swh = f.read()
-    if "extern int kswapd_unbind_cpu;" not in swh:
-        swh += "\nextern int kswapd_unbind_cpu;\n"
-        with open("include/linux/swap.h", "w", encoding="utf-8") as f:
-            f.write(swh)
-        print("Injected extern kswapd_unbind_cpu into include/linux/swap.h")
+# 37. Fix kswapd_unbind_cpu (Skipped: multi_kswapd.c provides kswapd_unbind_cpu)
+# Skipped to avoid duplicate symbol collision with multi_kswapd.o
 
 # 38. Neutralize healthinfo, task_mem, process_mm_reclaim, reserve_area, and multi_freearea in mm/Makefile
 if os.path.exists("mm/Makefile"):
